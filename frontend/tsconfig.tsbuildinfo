@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/layout/Layout.tsx","./src/pages/BattleCards.tsx","./src/pages/Dashboard.tsx","./src/pages/ProposalBuilder.tsx","./src/pages/QuoteCalculator.tsx"],"version":"5.7.3"}

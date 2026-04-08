@@ -1,0 +1,37 @@
+# Frontend CI — Vercel auto-deploys from GitHub push
+# This workflow validates the build before Vercel picks it up
+
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+    branches: [main]
+  pull_request:
+    paths:
+      - "frontend/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
