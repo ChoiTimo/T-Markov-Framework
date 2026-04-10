@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.api import health, customers, deals, quotes, battlecards, proposals
+from app.api import auth as auth_api
+from app.api import organizations as orgs_api
 
 settings = get_settings()
 
@@ -27,6 +29,8 @@ app.add_middleware(
 
 # Routers
 app.include_router(health.router, tags=["Health"])
+app.include_router(auth_api.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(orgs_api.router, prefix="/api/orgs", tags=["Organizations"])
 app.include_router(customers.router, prefix="/api/customers", tags=["Customers"])
 app.include_router(deals.router, prefix="/api/deals", tags=["Deals"])
 app.include_router(quotes.router, prefix="/api/quotes", tags=["Quotes"])

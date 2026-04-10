@@ -1,4 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import "./Layout.css";
 
 const navItems = [
@@ -9,6 +10,8 @@ const navItems = [
 ];
 
 function Layout() {
+  const { user, signOut } = useAuth();
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -31,7 +34,26 @@ function Layout() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <span className="phase-badge">Phase 0</span>
+          {user && (
+            <div className="user-section">
+              <div className="user-info">
+                {user.user_metadata?.avatar_url && (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt=""
+                    className="user-avatar"
+                  />
+                )}
+                <span className="user-email">
+                  {user.email?.split("@")[0]}
+                </span>
+              </div>
+              <button className="sign-out-btn" onClick={signOut}>
+                로그아웃
+              </button>
+            </div>
+          )}
+          <span className="phase-badge">Phase 1</span>
         </div>
       </aside>
       <main className="content">
