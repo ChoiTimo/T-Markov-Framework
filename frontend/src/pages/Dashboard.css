@@ -1,0 +1,236 @@
+.dashboard {
+  max-width: 960px;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+.dashboard-greeting {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.dashboard-subtitle {
+  color: var(--color-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.dashboard-org-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.org-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.role-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+
+/* Cards */
+.card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.card h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* Onboarding */
+.onboarding-card p {
+  color: var(--color-muted);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-primary {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1e40af;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text);
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.action-icon {
+  font-size: 24px;
+}
+
+/* Roadmap */
+.roadmap {
+  display: flex;
+  gap: 4px;
+}
+
+.roadmap-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border-radius: 8px;
+}
+
+.roadmap-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e2e8f0;
+}
+
+.roadmap-item.done .roadmap-dot {
+  background: #22c55e;
+}
+
+.roadmap-item.current .roadmap-dot {
+  background: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.roadmap-phase {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.roadmap-desc {
+  font-size: 12px;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.roadmap-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Tools Preview */
+.tools-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.tool-name {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.tool-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.tool-phase {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  color: var(--color-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}

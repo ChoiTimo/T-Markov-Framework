@@ -1,0 +1,408 @@
+/* ── Admin Pages — 공통 스타일 ──────────────── */
+
+.admin-page {
+  max-width: 960px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-subtitle {
+  color: var(--color-muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.member-count {
+  padding: 6px 14px;
+  background: #f1f5f9;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+/* ── Cards ──────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.card h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+/* ── Forms ──────────────────────────────────── */
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.input:disabled {
+  background: #f8fafc;
+  color: var(--color-muted);
+}
+
+.select {
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  background: #fff;
+  cursor: pointer;
+}
+
+.select-sm {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.form-msg {
+  font-size: 13px;
+}
+
+.form-msg.success {
+  color: #16a34a;
+}
+
+.form-msg.error {
+  color: #dc2626;
+}
+
+/* ── Buttons ────────────────────────────────── */
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1e40af;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.btn-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fecaca;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.btn-icon.danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ── Invite Section ─────────────────────────── */
+
+.invite-section {
+  margin-bottom: 20px;
+}
+
+.invite-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.invite-form .input {
+  flex: 1;
+}
+
+.invite-msg {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.invite-msg.success {
+  color: #16a34a;
+}
+
+.invite-msg.error {
+  color: #dc2626;
+}
+
+/* ── Data Table ─────────────────────────────── */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.data-table td {
+  padding: 12px;
+  font-size: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.member-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.member-name {
+  font-weight: 500;
+}
+
+.me-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.text-muted {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+/* ── Role Tags ──────────────────────────────── */
+
+.role-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.role-owner {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.role-admin {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.role-member {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.role-viewer {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+/* ── Audit Logs ─────────────────────────────── */
+
+.audit-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.audit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.audit-item:last-child {
+  border-bottom: none;
+}
+
+.audit-action-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.audit-resource {
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  color: var(--color-muted);
+}
+
+.audit-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.audit-user {
+  font-weight: 500;
+}
+
+/* ── Profile ────────────────────────────────── */
+
+.profile-account {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.profile-email {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ── States ─────────────────────────────────── */
+
+.loading {
+  color: var(--color-muted);
+  padding: 20px 0;
+  text-align: center;
+}
+
+.empty-state {
+  color: var(--color-muted);
+  padding: 40px 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.info-text {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-top: 16px;
+}
+
+/* ── Danger Zone ────────────────────────────── */
+
+.danger-zone {
+  border-color: #fecaca;
+}
+
+.danger-zone h3 {
+  color: #dc2626;
+}

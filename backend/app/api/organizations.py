@@ -95,19 +95,21 @@ async def _assert_org_role(user: CurrentUser, org_id: str, allowed: list[str]):
 # Endpoints
 # ------------------------------------------------------------------
 
-@router.get("/", response_model=list[OrgOut])
+@router.get("/")
 async def list_my_orgs(user: CurrentUser = Depends(get_current_user)):
-    """내가 소속된 조직 목록."""
+    """내가 소속된 조직 목록 (역할 포함)."""
     admin = get_supabase_admin()
     memberships = (
         admin.table("org_members")
-        .select("organization_id")
+        .select("organization_id, role")
         .eq("user_id", user.id)
         .execute()
     )
-    org_ids = [m["organization_id"] for m in (memberships.data or [])]
-    if not org_ids:
+    if not memberships.data:
         return []
+
+    org_ids = [m["organization_id"] for m in memberships.data]
+    role_map = {m["organization_id"]: m["role"] for m in memberships.data}
 
     orgs = (
         admin.table("organizations")
@@ -115,7 +117,8 @@ async def list_my_orgs(user: CurrentUser = Depends(get_current_user)):
         .in_("id", org_ids)
         .execute()
     )
-    return orgs.data or []
+    # Enrich with role
+    return [{**org, "role": role_map.get(org["id"], "viewer")} for org in (orgs.data or [])]
 
 
 @router.post("/", response_model=OrgOut, status_code=status.HTTP_201_CREATED)
@@ -332,3 +335,49 @@ async def remove_member(
         )
 
     admin.table("org_members").delete().eq("organization_id", org_id).eq("user_id", user_id).execute()
+
+
+# ------------------------------------------------------------------
+# Audit Logs
+# ------------------------------------------------------------------
+
+@router.get("/{org_id}/audit-logs")
+async def list_audit_logs(
+    org_id: str,
+    limit: int = 50,
+    offset: int = 0,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """감사 로그 조회 (admin 이상)."""
+    await _assert_org_role(user, org_id, ["owner", "admin"])
+    admin = get_supabase_admin()
+
+    logs = (
+        admin.table("audit_logs")
+        .select("*")
+        .eq("organization_id", org_id)
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+
+    # Enrich with profile info
+    result = []
+    user_cache: dict = {}
+    for log in (logs.data or []):
+        uid = log.get("user_id")
+        if uid and uid not in user_cache:
+            profile = (
+                admin.table("profiles")
+                .select("email, full_name, avatar_url")
+                .eq("id", uid)
+                .maybe_single()
+                .execute()
+            )
+            user_cache[uid] = profile.data if profile.data else {}
+        result.append({
+            **log,
+            "profile": user_cache.get(uid, {}),
+        })
+
+    return result

@@ -17,7 +17,7 @@
 }
 
 .sidebar-header {
-  padding: 0 20px 20px;
+  padding: 0 20px 16px;
   border-bottom: 1px solid #1e293b;
   display: flex;
   align-items: baseline;
@@ -35,12 +35,63 @@
   color: var(--color-muted);
 }
 
+/* ── Org Switcher ─────────────────────────── */
+
+.org-switcher {
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.org-select {
+  flex: 1;
+  padding: 6px 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  min-width: 0;
+}
+
+.org-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.role-pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: #1d4ed8;
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+/* ── Navigation ───────────────────────────── */
+
 .sidebar-nav {
   flex: 1;
   padding: 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+}
+
+.nav-section-label {
+  padding: 8px 16px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #475569;
 }
 
 .nav-item {
@@ -66,6 +117,8 @@
   font-weight: 500;
 }
 
+/* ── Footer / User ────────────────────────── */
+
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid #1e293b;
@@ -75,11 +128,23 @@
   margin-bottom: 12px;
 }
 
+.user-info-link {
+  text-decoration: none;
+  color: inherit;
+}
+
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.user-info-link:hover .user-info {
+  background: #1e293b;
 }
 
 .user-avatar {
@@ -123,6 +188,8 @@
   color: #60a5fa;
   font-weight: 600;
 }
+
+/* ── Content ──────────────────────────────── */
 
 .content {
   flex: 1;
