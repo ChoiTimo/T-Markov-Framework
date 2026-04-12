@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import Sequence
 
+import httpx
 from fastapi import Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 
@@ -26,6 +28,39 @@ class CurrentUser:
 
 
 # ------------------------------------------------------------------
+# JWKS cache for ES256 verification
+# ------------------------------------------------------------------
+
+_jwks_cache: dict = {"keys": [], "fetched_at": 0.0}
+_JWKS_TTL = 3600  # re-fetch every 1 hour
+
+
+def _get_jwks() -> list[dict]:
+    """Fetch and cache Supabase JWKS (public keys for ES256)."""
+    now = time.time()
+    if _jwks_cache["keys"] and (now - _jwks_cache["fetched_at"]) < _JWKS_TTL:
+        return _jwks_cache["keys"]
+
+    settings = get_settings()
+    url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+    resp = httpx.get(url, timeout=10)
+    resp.raise_for_status()
+    keys = resp.json().get("keys", [])
+    _jwks_cache["keys"] = keys
+    _jwks_cache["fetched_at"] = now
+    return keys
+
+
+def _find_jwk(kid: str) -> dict:
+    """Find a JWK by key ID from cached JWKS."""
+    keys = _get_jwks()
+    for key in keys:
+        if key.get("kid") == kid:
+            return key
+    raise ValueError(f"JWK with kid={kid} not found in JWKS")
+
+
+# ------------------------------------------------------------------
 # JWT verification
 # ------------------------------------------------------------------
 
@@ -34,6 +69,7 @@ async def get_current_user(
 ) -> CurrentUser:
     """Extract & verify Supabase JWT from Authorization header.
 
+    Supports both ES256 (JWKS-based) and legacy HS256 (secret-based).
     Expects: `Bearer <token>`
     """
     settings = get_settings()
@@ -47,18 +83,37 @@ async def get_current_user(
     token = authorization[7:]
 
     try:
-        # Supabase JWT secret = project JWT secret (Settings > API > JWT Secret)
-        # For anon/service_role JWTs, the secret is the SUPABASE_JWT_SECRET env var.
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        # Read unverified header to determine algorithm
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg", "HS256")
+
+        if alg == "ES256":
+            # Modern Supabase: verify with JWKS public key
+            kid = header.get("kid", "")
+            key = _find_jwk(kid)
+            payload = jwt.decode(
+                token,
+                key,
+                algorithms=["ES256"],
+                audience="authenticated",
+            )
+        else:
+            # Legacy HS256: verify with JWT secret
+            payload = jwt.decode(
+                token,
+                settings.supabase_jwt_secret,
+                algorithms=["HS256"],
+                audience="authenticated",
+            )
     except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {e}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token verification failed: {e}",
         )
 
     return CurrentUser(
