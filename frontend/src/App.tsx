@@ -3,6 +3,7 @@ import Layout from "@/components/layout/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Dashboard from "@/pages/Dashboard";
 import QuoteCalculator from "@/pages/QuoteCalculator";
+import QuoteEditor from "@/pages/QuoteEditor";
 import BattleCards from "@/pages/BattleCards";
 import ProposalBuilder from "@/pages/ProposalBuilder";
 import Members from "@/pages/Members";
@@ -26,6 +27,8 @@ function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="quotes" element={<QuoteCalculator />} />
+        <Route path="quotes/new" element={<QuoteEditor />} />
+        <Route path="quotes/:id" element={<QuoteEditor />} />
         <Route path="battlecards" element={<BattleCards />} />
         <Route path="proposals" element={<ProposalBuilder />} />
         {/* Admin */}
