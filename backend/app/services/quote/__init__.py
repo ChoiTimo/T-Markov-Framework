@@ -1,0 +1,1 @@
+"""Quote calculator service package."""
