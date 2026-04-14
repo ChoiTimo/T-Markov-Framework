@@ -5,6 +5,7 @@ import Dashboard from "@/pages/Dashboard";
 import QuoteCalculator from "@/pages/QuoteCalculator";
 import QuoteEditor from "@/pages/QuoteEditor";
 import BattleCards from "@/pages/BattleCards";
+import BattleCardDetail from "@/pages/BattleCardDetail";
 import ProposalBuilder from "@/pages/ProposalBuilder";
 import Members from "@/pages/Members";
 import OrgSettings from "@/pages/OrgSettings";
@@ -30,6 +31,7 @@ function App() {
         <Route path="quotes/new" element={<QuoteEditor />} />
         <Route path="quotes/:id" element={<QuoteEditor />} />
         <Route path="battlecards" element={<BattleCards />} />
+        <Route path="battlecards/:id" element={<BattleCardDetail />} />
         <Route path="proposals" element={<ProposalBuilder />} />
         {/* Admin */}
         <Route path="members" element={<Members />} />
