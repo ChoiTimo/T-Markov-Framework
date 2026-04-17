@@ -7,6 +7,7 @@ import QuoteEditor from "@/pages/QuoteEditor";
 import BattleCards from "@/pages/BattleCards";
 import BattleCardDetail from "@/pages/BattleCardDetail";
 import ProposalBuilder from "@/pages/ProposalBuilder";
+import ProposalEditor from "@/pages/ProposalEditor";
 import Members from "@/pages/Members";
 import OrgSettings from "@/pages/OrgSettings";
 import CreateOrg from "@/pages/CreateOrg";
@@ -33,6 +34,7 @@ function App() {
         <Route path="battlecards" element={<BattleCards />} />
         <Route path="battlecards/:id" element={<BattleCardDetail />} />
         <Route path="proposals" element={<ProposalBuilder />} />
+        <Route path="proposals/:id" element={<ProposalEditor />} />
         {/* Admin */}
         <Route path="members" element={<Members />} />
         <Route path="org/settings" element={<OrgSettings />} />
