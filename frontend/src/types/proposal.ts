@@ -130,6 +130,16 @@ export interface Proposal {
   battle_cards?: Record<string, unknown>[];
 }
 
+export interface ProposalVersion {
+  id: string;
+  proposal_id: string;
+  version_number: number;
+  snapshot: Record<string, unknown>;
+  change_summary: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface AssembleResult {
   selection_stats: {
     total_selected: number;

@@ -1,19 +1,49 @@
 /**
- * ProposalEditor — 제안서 상세/편집 페이지 (Phase 2 Sprint 2-3)
- * 슬라이드 인스턴스 목록 편집, assemble/render, quote/battlecard 연결
+ * ProposalEditor — Sprint 2-4 (extended editor)
+ *
+ * Sprint 2-3 baseline + Sprint 2-4 additions:
+ *  - DnD slide reordering (@dnd-kit sortable)
+ *  - Per-slide duplicate / delete actions
+ *  - Module library reselection (insert from 18-module catalog)
+ *  - Version drawer with snapshot restore
+ *  - Inline markdown editor for slide body text
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useOrg } from "@/contexts/OrgContext";
 import { listCards } from "@/services/battlecards";
 import { listQuotes } from "@/services/quotes";
 import {
   assembleProposal,
+  deleteSlide,
   downloadBlob,
+  duplicateSlide,
   getProposal,
+  insertSlide,
+  listSlideModules,
+  listVersions,
   patchSlide,
   publishProposal,
   renderProposalPptx,
+  reorderSlides,
+  restoreVersion,
   snapshotVersion,
   updateProposal,
 } from "@/services/proposals";
@@ -22,7 +52,10 @@ import type {
   NeuroLevel,
   Proposal,
   ProposalSlide,
+  ProposalSlideModule,
   ProposalStatus,
+  ProposalVersion,
+  SlidePhase,
   TargetPersona,
 } from "@/types/proposal";
 import {
@@ -37,6 +70,64 @@ import {
 import type { BattleCard } from "@/types/battlecard";
 import type { Quote } from "@/types/quote";
 import "./Proposals.css";
+
+// ------------------------------------------------------------------
+// Simple markdown renderer (bold, bullets, line breaks).
+// Keeps us free of extra runtime deps while covering 90% of cases.
+// ------------------------------------------------------------------
+
+function renderMarkdown(src: string): ReactElement {
+  const lines = src.split("\n");
+  const blocks: ReactElement[] = [];
+  let bulletBuf: string[] = [];
+  const flushBullets = (key: string) => {
+    if (!bulletBuf.length) return;
+    blocks.push(
+      <ul key={key} className="pe-md-bullets">
+        {bulletBuf.map((b, i) => (
+          <li key={i} dangerouslySetInnerHTML={{ __html: inlineMd(b) }} />
+        ))}
+      </ul>,
+    );
+    bulletBuf = [];
+  };
+  lines.forEach((raw, idx) => {
+    const line = raw.trimEnd();
+    if (/^[-*]\s+/.test(line)) {
+      bulletBuf.push(line.replace(/^[-*]\s+/, ""));
+    } else if (line === "") {
+      flushBullets(`u-${idx}`);
+      blocks.push(<div key={`sp-${idx}`} className="pe-md-spacer" />);
+    } else {
+      flushBullets(`u-${idx}`);
+      blocks.push(
+        <p
+          key={`p-${idx}`}
+          className="pe-md-p"
+          dangerouslySetInnerHTML={{ __html: inlineMd(line) }}
+        />,
+      );
+    }
+  });
+  flushBullets("u-end");
+  return <div className="pe-md-preview">{blocks}</div>;
+}
+
+function inlineMd(text: string): string {
+  // Order matters: escape first, then bold, then italic.
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return escaped
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+// ------------------------------------------------------------------
+// Main component
+// ------------------------------------------------------------------
 
 function ProposalEditor() {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +145,21 @@ function ProposalEditor() {
   const [lastAssemble, setLastAssemble] = useState<AssembleResult | null>(null);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
 
+  // Sprint 2-4 state
+  const [showModuleLib, setShowModuleLib] = useState(false);
+  const [moduleInsertPosition, setModuleInsertPosition] = useState<number | null>(null);
+  const [modules, setModules] = useState<ProposalSlideModule[]>([]);
+  const [modulesLoaded, setModulesLoaded] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<ProposalVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+
   const canEdit = myRole === "owner" || myRole === "admin" || myRole === "member";
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   async function reload() {
     if (!id) return;
@@ -94,6 +199,17 @@ function ProposalEditor() {
     () => slides.find((s) => s.id === activeSlideId) || null,
     [slides, activeSlideId],
   );
+
+  async function ensureModulesLoaded() {
+    if (modulesLoaded || !currentOrg) return;
+    try {
+      const mods = await listSlideModules(currentOrg.id);
+      setModules(mods);
+      setModulesLoaded(true);
+    } catch (e: any) {
+      alert(e.message || "모듈 카탈로그 로드 실패");
+    }
+  }
 
   async function handleHeaderSave(patch: Partial<Proposal>) {
     if (!proposal) return;
@@ -148,7 +264,7 @@ function ProposalEditor() {
     try {
       await snapshotVersion(proposal.id, note);
       alert("버전 스냅샷이 저장되었습니다.");
-      reload();
+      await refreshVersions();
     } catch (e: any) {
       alert(e.message || "스냅샷 실패");
     }
@@ -163,6 +279,101 @@ function ProposalEditor() {
       alert(e.message || "슬라이드 저장 실패");
     }
   }
+
+  // ----- Sprint 2-4 handlers -----
+
+  async function handleDragEnd(event: DragEndEvent) {
+    if (!proposal) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = slides.findIndex((s) => s.id === active.id);
+    const newIdx = slides.findIndex((s) => s.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+
+    const prev = slides;
+    const reordered = arrayMove(slides, oldIdx, newIdx);
+    // Re-assign contiguous sort_orders for UI
+    const withOrder = reordered.map((s, i) => ({ ...s, sort_order: (i + 1) * 10 }));
+    setSlides(withOrder);
+    try {
+      await reorderSlides(
+        proposal.id,
+        withOrder.map((s) => ({ id: s.id, sort_order: s.sort_order })),
+      );
+    } catch (e: any) {
+      setSlides(prev);
+      alert(e.message || "순서 변경 실패");
+    }
+  }
+
+  async function handleDuplicate(slideId: string) {
+    if (!proposal) return;
+    try {
+      await duplicateSlide(proposal.id, slideId);
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "슬라이드 복제 실패");
+    }
+  }
+
+  async function handleDelete(slideId: string) {
+    if (!proposal) return;
+    if (!confirm("이 슬라이드를 삭제하시겠어요? (되돌리려면 버전 스냅샷에서 복원하세요)")) return;
+    try {
+      await deleteSlide(proposal.id, slideId);
+      if (activeSlideId === slideId) setActiveSlideId(null);
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "슬라이드 삭제 실패");
+    }
+  }
+
+  async function handleInsertModule(moduleCode: string) {
+    if (!proposal) return;
+    try {
+      await insertSlide(proposal.id, {
+        module_code: moduleCode,
+        position: moduleInsertPosition ?? undefined,
+      });
+      setShowModuleLib(false);
+      setModuleInsertPosition(null);
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "슬라이드 추가 실패");
+    }
+  }
+
+  async function refreshVersions() {
+    if (!proposal) return;
+    setVersionsLoading(true);
+    try {
+      const rows = await listVersions(proposal.id);
+      setVersions(rows);
+    } catch (e: any) {
+      alert(e.message || "버전 목록 로드 실패");
+    } finally {
+      setVersionsLoading(false);
+    }
+  }
+
+  async function openVersionDrawer() {
+    setShowVersions(true);
+    await refreshVersions();
+  }
+
+  async function handleRestoreVersion(v: ProposalVersion) {
+    if (!proposal) return;
+    if (!confirm(`v${v.version_number}로 복원하시겠어요? 현재 상태는 자동 스냅샷이 저장됩니다.`)) return;
+    try {
+      await restoreVersion(proposal.id, v.id, { snapshot_before_restore: true });
+      setShowVersions(false);
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "복원 실패");
+    }
+  }
+
+  // ----- Body preview (read-only) -----
 
   function renderSlidePreview(s: ProposalSlide) {
     const body = (s.body || {}) as Record<string, any>;
@@ -236,6 +447,9 @@ function ProposalEditor() {
               </button>
               <button className="btn btn-ghost" onClick={handleSnapshot}>
                 버전 스냅샷
+              </button>
+              <button className="btn btn-ghost" onClick={openVersionDrawer}>
+                버전 기록
               </button>
               <button className="btn btn-primary" disabled={rendering} onClick={handleRender}>
                 {rendering ? "생성 중..." : "PPTX 내보내기"}
@@ -311,7 +525,7 @@ function ProposalEditor() {
             </select>
           </label>
           <label>
-            <span>배틀카드 (쉼표 구분)</span>
+            <span>배틀카드 (복수 선택)</span>
             <select
               multiple
               value={proposal.battle_card_ids}
@@ -366,27 +580,49 @@ function ProposalEditor() {
       <div className="pe-slides-layout">
         <div className="pe-slides-list">
           <div className="pe-slides-header">
-            슬라이드 ({slides.length}장)
+            <span>슬라이드 ({slides.length}장)</span>
+            {canEdit && (
+              <button
+                className="pe-icon-btn"
+                title="모듈 라이브러리에서 추가"
+                onClick={() => {
+                  setModuleInsertPosition(null);
+                  setShowModuleLib(true);
+                  ensureModulesLoaded();
+                }}
+              >
+                + 모듈 추가
+              </button>
+            )}
           </div>
-          {slides.map((s, idx) => (
-            <div
-              key={s.id}
-              className={`pe-slide-tile ${activeSlideId === s.id ? "active" : ""}`}
-              onClick={() => setActiveSlideId(s.id)}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={slides.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className="pe-slide-tile-head">
-                <span className="pe-slide-no">{idx + 1}</span>
-                <span
-                  className="pe-slide-phase-dot"
-                  style={{ background: PHASE_COLORS[s.phase] }}
+              {slides.map((s, idx) => (
+                <SortableSlideTile
+                  key={s.id}
+                  slide={s}
+                  index={idx}
+                  active={activeSlideId === s.id}
+                  canEdit={canEdit}
+                  onSelect={() => setActiveSlideId(s.id)}
+                  onDuplicate={() => handleDuplicate(s.id)}
+                  onDelete={() => handleDelete(s.id)}
+                  onInsertAfter={() => {
+                    setModuleInsertPosition(idx + 2);
+                    setShowModuleLib(true);
+                    ensureModulesLoaded();
+                  }}
                 />
-                <span className="pe-slide-code">{s.code}</span>
-                {s.is_customized && <span className="pe-custom-badge">편집</span>}
-                {!s.is_enabled && <span className="pe-disabled-badge">비활성</span>}
-              </div>
-              <div className="pe-slide-tile-title">{s.title || s.name}</div>
-            </div>
-          ))}
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
 
         <div className="pe-slide-preview">
@@ -417,13 +653,20 @@ function ProposalEditor() {
               </div>
               {renderSlidePreview(activeSlide)}
               {canEdit && (
-                <details className="pe-raw-editor">
-                  <summary>원본 body(JSON) 편집 (고급)</summary>
-                  <BodyJsonEditor
+                <>
+                  <MarkdownBodyEditor
+                    key={activeSlide.id}
                     slide={activeSlide}
                     onSave={(body) => handleSlidePatch(activeSlide.id, { body } as any)}
                   />
-                </details>
+                  <details className="pe-raw-editor">
+                    <summary>원본 body(JSON) 편집 (고급)</summary>
+                    <BodyJsonEditor
+                      slide={activeSlide}
+                      onSave={(body) => handleSlidePatch(activeSlide.id, { body } as any)}
+                    />
+                  </details>
+                </>
               )}
             </>
           ) : (
@@ -433,9 +676,406 @@ function ProposalEditor() {
           )}
         </div>
       </div>
+
+      {showModuleLib && (
+        <ModuleLibraryModal
+          modules={modules}
+          insertPosition={moduleInsertPosition}
+          onClose={() => {
+            setShowModuleLib(false);
+            setModuleInsertPosition(null);
+          }}
+          onSelect={handleInsertModule}
+        />
+      )}
+
+      {showVersions && (
+        <VersionDrawer
+          versions={versions}
+          loading={versionsLoading}
+          onClose={() => setShowVersions(false)}
+          onRestore={handleRestoreVersion}
+          canRestore={canEdit}
+        />
+      )}
     </div>
   );
 }
+
+// ------------------------------------------------------------------
+// Sortable slide tile
+// ------------------------------------------------------------------
+
+interface SortableSlideTileProps {
+  slide: ProposalSlide;
+  index: number;
+  active: boolean;
+  canEdit: boolean;
+  onSelect: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onInsertAfter: () => void;
+}
+
+function SortableSlideTile({
+  slide,
+  index,
+  active,
+  canEdit,
+  onSelect,
+  onDuplicate,
+  onDelete,
+  onInsertAfter,
+}: SortableSlideTileProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: slide.id });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`pe-slide-tile ${active ? "active" : ""} ${isDragging ? "dragging" : ""}`}
+      onClick={onSelect}
+    >
+      <div className="pe-slide-tile-head">
+        {canEdit && (
+          <button
+            className="pe-drag-handle"
+            title="드래그하여 순서 변경"
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+          >
+            ⋮⋮
+          </button>
+        )}
+        <span className="pe-slide-no">{index + 1}</span>
+        <span
+          className="pe-slide-phase-dot"
+          style={{ background: PHASE_COLORS[slide.phase] }}
+        />
+        <span className="pe-slide-code">{slide.code}</span>
+        {slide.is_customized && <span className="pe-custom-badge">편집</span>}
+        {!slide.is_enabled && <span className="pe-disabled-badge">비활성</span>}
+      </div>
+      <div className="pe-slide-tile-title">{slide.title || slide.name}</div>
+      {canEdit && (
+        <div className="pe-slide-tile-actions">
+          <button
+            className="pe-tile-action"
+            title="이 슬라이드 뒤에 모듈 추가"
+            onClick={(e) => {
+              e.stopPropagation();
+              onInsertAfter();
+            }}
+          >
+            + 뒤에 추가
+          </button>
+          <button
+            className="pe-tile-action"
+            title="복제"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+          >
+            복제
+          </button>
+          <button
+            className="pe-tile-action danger"
+            title="삭제"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            삭제
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Module Library Modal
+// ------------------------------------------------------------------
+
+interface ModuleLibraryModalProps {
+  modules: ProposalSlideModule[];
+  insertPosition: number | null;
+  onClose: () => void;
+  onSelect: (moduleCode: string) => void;
+}
+
+function ModuleLibraryModal({
+  modules,
+  insertPosition,
+  onClose,
+  onSelect,
+}: ModuleLibraryModalProps) {
+  const [phaseFilter, setPhaseFilter] = useState<SlidePhase | "">("");
+  const [dogmaFilter, setDogmaFilter] = useState("");
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    return modules.filter((m) => {
+      if (phaseFilter && m.phase !== phaseFilter) return false;
+      if (dogmaFilter && m.neuro_dogma !== dogmaFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const hay = `${m.code} ${m.name} ${m.description ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [modules, phaseFilter, dogmaFilter, search]);
+
+  return (
+    <div className="pe-modal-backdrop" onClick={onClose}>
+      <div className="pe-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="pe-modal-head">
+          <h3>모듈 라이브러리에서 슬라이드 추가</h3>
+          <span className="muted small">
+            {insertPosition ? `위치: ${insertPosition}번째에 삽입` : "맨 뒤에 추가"}
+          </span>
+          <button className="btn-link" onClick={onClose}>닫기</button>
+        </div>
+        <div className="pe-modal-filters">
+          <input
+            placeholder="코드/이름 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select value={phaseFilter} onChange={(e) => setPhaseFilter(e.target.value as SlidePhase | "")}>
+            <option value="">전체 Phase</option>
+            {(Object.keys(PHASE_LABELS) as SlidePhase[]).map((p) => (
+              <option key={p} value={p}>
+                {PHASE_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <select value={dogmaFilter} onChange={(e) => setDogmaFilter(e.target.value)}>
+            <option value="">전체 Dogma</option>
+            {Object.entries(DOGMA_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="pe-modal-body">
+          {filtered.length === 0 ? (
+            <div className="muted" style={{ padding: 20 }}>
+              조건에 맞는 모듈이 없습니다.
+            </div>
+          ) : (
+            <ul className="pe-module-list">
+              {filtered.map((m) => (
+                <li key={m.id} className="pe-module-item">
+                  <div className="pe-module-head">
+                    <span
+                      className="pe-slide-phase-dot"
+                      style={{ background: PHASE_COLORS[m.phase] }}
+                    />
+                    <span className="pe-module-code">{m.code}</span>
+                    <span className="pe-module-name">{m.name}</span>
+                    {m.is_required && <span className="pe-required-badge">필수</span>}
+                    {m.neuro_dogma && (
+                      <span className="pe-dogma-badge">{DOGMA_LABELS[m.neuro_dogma]}</span>
+                    )}
+                  </div>
+                  {m.description && <div className="pe-module-desc">{m.description}</div>}
+                  <div className="pe-module-foot">
+                    <span className="muted small">
+                      최소 레벨: {NEURO_LEVEL_LABELS[m.min_neuro_level]}
+                    </span>
+                    <button
+                      className="btn btn-primary small"
+                      onClick={() => onSelect(m.code)}
+                    >
+                      이 모듈로 추가
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Version Drawer
+// ------------------------------------------------------------------
+
+interface VersionDrawerProps {
+  versions: ProposalVersion[];
+  loading: boolean;
+  canRestore: boolean;
+  onClose: () => void;
+  onRestore: (v: ProposalVersion) => void;
+}
+
+function VersionDrawer({ versions, loading, canRestore, onClose, onRestore }: VersionDrawerProps) {
+  return (
+    <div className="pe-drawer-backdrop" onClick={onClose}>
+      <div className="pe-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="pe-drawer-head">
+          <h3>버전 기록</h3>
+          <button className="btn-link" onClick={onClose}>닫기</button>
+        </div>
+        <div className="pe-drawer-body">
+          {loading ? (
+            <div className="muted" style={{ padding: 20 }}>로드 중...</div>
+          ) : versions.length === 0 ? (
+            <div className="muted" style={{ padding: 20 }}>
+              아직 저장된 버전이 없습니다. 상단의 "버전 스냅샷" 버튼으로 현재 상태를 저장할 수 있습니다.
+            </div>
+          ) : (
+            <ul className="pe-version-list">
+              {versions.map((v) => {
+                const snap = (v.snapshot ?? {}) as Record<string, unknown>;
+                const slideCount = Array.isArray(snap.slides) ? (snap.slides as unknown[]).length : 0;
+                const isAuto = Boolean((snap as any).auto);
+                return (
+                  <li key={v.id} className="pe-version-item">
+                    <div className="pe-version-head">
+                      <span className="pe-version-no">v{v.version_number}</span>
+                      {isAuto && <span className="pe-auto-badge">자동</span>}
+                      <span className="muted small">
+                        {new Date(v.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="pe-version-summary">
+                      {v.change_summary || "(요약 없음)"}
+                    </div>
+                    <div className="pe-version-meta muted small">
+                      슬라이드 {slideCount}장
+                    </div>
+                    {canRestore && (
+                      <div className="pe-version-actions">
+                        <button
+                          className="btn btn-ghost small"
+                          onClick={() => onRestore(v)}
+                        >
+                          이 버전으로 복원
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Markdown body editor — edits body.narrative as markdown string
+// ------------------------------------------------------------------
+
+interface MarkdownBodyEditorProps {
+  slide: ProposalSlide;
+  onSave: (body: Record<string, unknown>) => void;
+}
+
+function MarkdownBodyEditor({ slide, onSave }: MarkdownBodyEditorProps) {
+  const body = (slide.body || {}) as Record<string, any>;
+  const initial =
+    typeof body.narrative === "string"
+      ? body.narrative
+      : typeof body.scenario === "string"
+      ? body.scenario
+      : "";
+
+  const [mode, setMode] = useState<"edit" | "preview" | "split">("split");
+  const [text, setText] = useState(initial);
+  const [dirty, setDirty] = useState(false);
+  const lastSlideId = useRef(slide.id);
+
+  useEffect(() => {
+    if (lastSlideId.current !== slide.id) {
+      setText(initial);
+      setDirty(false);
+      lastSlideId.current = slide.id;
+    }
+  }, [slide.id, initial]);
+
+  function save() {
+    const patch: Record<string, unknown> = { ...body };
+    if ("narrative" in body || !("scenario" in body)) {
+      patch.narrative = text;
+    } else {
+      patch.scenario = text;
+    }
+    onSave(patch);
+    setDirty(false);
+  }
+
+  return (
+    <div className="pe-md-editor">
+      <div className="pe-md-toolbar">
+        <strong className="pe-md-title">본문 (Markdown)</strong>
+        <div className="pe-md-mode-group">
+          {(["edit", "split", "preview"] as const).map((m) => (
+            <button
+              key={m}
+              className={`pe-md-mode ${mode === m ? "active" : ""}`}
+              onClick={() => setMode(m)}
+            >
+              {m === "edit" ? "편집" : m === "preview" ? "미리보기" : "나란히"}
+            </button>
+          ))}
+        </div>
+        <button
+          className="btn btn-primary small"
+          disabled={!dirty}
+          onClick={save}
+        >
+          저장
+        </button>
+      </div>
+      <div className={`pe-md-panels mode-${mode}`}>
+        {(mode === "edit" || mode === "split") && (
+          <textarea
+            className="pe-md-textarea"
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setDirty(e.target.value !== initial);
+            }}
+            placeholder={'**Bold** 또는 - 불릿 사용 가능\n\n예:\n- 핵심 포인트 1\n- 핵심 포인트 2'}
+            rows={10}
+          />
+        )}
+        {(mode === "preview" || mode === "split") && (
+          <div className="pe-md-preview-panel">
+            {text.trim() === "" ? (
+              <div className="muted small">미리보기에 표시할 내용이 없습니다.</div>
+            ) : (
+              renderMarkdown(text)
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// JSON body editor (unchanged from Sprint 2-3 / advanced mode)
+// ------------------------------------------------------------------
 
 function BodyJsonEditor({
   slide,

@@ -1,16 +1,18 @@
 """Proposal Generator API — Phase 2 Sprint 2-3.
 
 Endpoints:
-  /templates              — GET list, POST create, PATCH/DELETE (admin)
-  /modules                — GET slide module catalog
-  /                       — GET list proposals, POST create
-  /{id}                   — GET / PATCH / DELETE
-  /{id}/slides            — GET list, PUT reorder
-  /{id}/slides/{slide_id} — PATCH (edit body/enable)
-  /{id}/assemble          — POST regenerate slides from modules + context
-  /{id}/render            — POST render PPTX (returns binary)
-  /{id}/publish           — POST mark as approved/sent
-  /{id}/versions          — GET list, POST snapshot
+  /templates                           — GET list, POST create, PATCH/DELETE (admin)
+  /modules                             — GET slide module catalog
+  /                                    — GET list proposals, POST create
+  /{id}                                — GET / PATCH / DELETE
+  /{id}/slides                         — GET list, POST insert (Sprint 2-4), PUT reorder
+  /{id}/slides/{slide_id}              — PATCH (edit body/enable), DELETE (Sprint 2-4)
+  /{id}/slides/{slide_id}/duplicate    — POST clone slide (Sprint 2-4)
+  /{id}/assemble                       — POST regenerate slides from modules + context
+  /{id}/render                         — POST render PPTX (returns binary)
+  /{id}/publish                        — POST mark as approved/sent
+  /{id}/versions                       — GET list, POST snapshot
+  /{id}/versions/{version_id}/restore  — POST restore slides from snapshot (Sprint 2-4)
 """
 
 from __future__ import annotations
@@ -91,6 +93,26 @@ class SlidePatch(BaseModel):
 class ReorderItem(BaseModel):
     id: str
     sort_order: int
+
+
+class SlideInsert(BaseModel):
+    """Insert a new slide into a proposal.
+
+    Either `module_code` (to materialize from the module catalog) or
+    `raw` (to insert a fully custom slide) must be provided.
+    `position` is 1-based; omit to append at the end.
+    """
+    module_code: str | None = None
+    raw: dict | None = None
+    position: int | None = None
+    title: str | None = None
+    subtitle: str | None = None
+    body: dict | None = None
+
+
+class VersionRestoreRequest(BaseModel):
+    snapshot_before_restore: bool = True
+    change_summary: str | None = None
 
 
 class AssembleRequest(BaseModel):
@@ -380,6 +402,197 @@ async def reorder_slides(
     return {"ok": True, "count": len(items)}
 
 
+# ----- Sprint 2-4: slide insert / duplicate / delete -----
+
+def _resequence_slides(admin, proposal_id: str) -> list[dict]:
+    """Rewrite sort_order as contiguous 10, 20, 30, ... preserving current order."""
+    rows = (
+        admin.table("proposal_slides").select("id, sort_order")
+        .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+    )
+    for idx, row in enumerate(rows):
+        new_order = (idx + 1) * 10
+        if row["sort_order"] != new_order:
+            admin.table("proposal_slides").update({"sort_order": new_order}).eq("id", row["id"]).execute()
+    return (
+        admin.table("proposal_slides").select("*")
+        .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+    )
+
+
+def _slide_row_from_module(module: dict, proposal_id: str, sort_order: int,
+                           overrides: dict | None = None) -> dict:
+    """Materialize a fresh proposal_slides row from a module catalog entry."""
+    default_body = module.get("default_body") or {}
+    body = dict(default_body)
+    if overrides and overrides.get("body"):
+        body.update(overrides["body"])
+    return {
+        "proposal_id": proposal_id,
+        "module_id": module.get("id"),
+        "code": module["code"],
+        "name": module["name"],
+        "phase": module["phase"],
+        "neuro_dogma": module.get("neuro_dogma"),
+        "title": (overrides or {}).get("title") or body.get("title") or module["name"],
+        "subtitle": (overrides or {}).get("subtitle") or body.get("subtitle"),
+        "body": body,
+        "speaker_notes": body.get("speaker_notes"),
+        "sort_order": sort_order,
+        "is_enabled": True,
+        "is_customized": bool(overrides),
+        "ai_generated": False,
+    }
+
+
+@router.post("/{proposal_id}/slides", status_code=201)
+async def insert_slide(
+    proposal_id: str,
+    body: SlideInsert,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Insert a new slide at `position` (1-based). Appends to end if omitted.
+
+    Source of the slide payload is one of:
+      * module_code  → pulled from proposal_slide_modules catalog
+      * raw          → caller-supplied row (must include code, name, phase)
+    """
+    proposal = await _load_proposal_or_404(proposal_id, user)
+    await _assert_org_role(user, proposal["organization_id"], ["owner", "admin", "member"])
+    admin = get_supabase_admin()
+
+    existing = (
+        admin.table("proposal_slides").select("id, sort_order")
+        .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+    )
+
+    # Resolve row payload
+    row: dict
+    if body.module_code:
+        mod = (
+            admin.table("proposal_slide_modules").select("*")
+            .eq("code", body.module_code).eq("is_active", True)
+            .or_(f"organization_id.is.null,organization_id.eq.{proposal['organization_id']}")
+            .limit(1).execute().data or []
+        )
+        if not mod:
+            raise HTTPException(404, f"Module {body.module_code} not found")
+        row = _slide_row_from_module(
+            mod[0],
+            proposal_id,
+            sort_order=0,
+            overrides={
+                "title": body.title,
+                "subtitle": body.subtitle,
+                "body": body.body,
+            } if any([body.title, body.subtitle, body.body]) else None,
+        )
+    elif body.raw:
+        required = {"code", "name", "phase"}
+        missing = required - set(body.raw.keys())
+        if missing:
+            raise HTTPException(400, f"raw slide missing fields: {sorted(missing)}")
+        row = {
+            **body.raw,
+            "proposal_id": proposal_id,
+            "is_customized": True,
+            "is_enabled": body.raw.get("is_enabled", True),
+        }
+    else:
+        raise HTTPException(400, "Either module_code or raw is required")
+
+    # Compute insertion sort_order
+    pos = body.position
+    if pos is None or pos > len(existing):
+        row["sort_order"] = ((existing[-1]["sort_order"] if existing else 0) + 10) if existing else 10
+        inserted = admin.table("proposal_slides").insert(row).execute()
+        return inserted.data[0] if inserted.data else None
+
+    if pos < 1:
+        pos = 1
+    # Shift everyone at/after target position
+    target_index = pos - 1
+    if target_index < len(existing):
+        target_order = existing[target_index]["sort_order"]
+        row["sort_order"] = target_order
+        # +10 to everyone at/after target
+        for r in existing[target_index:]:
+            admin.table("proposal_slides").update(
+                {"sort_order": r["sort_order"] + 10}
+            ).eq("id", r["id"]).execute()
+    else:
+        row["sort_order"] = ((existing[-1]["sort_order"] if existing else 0) + 10) if existing else 10
+
+    inserted = admin.table("proposal_slides").insert(row).execute()
+    new_slide = inserted.data[0] if inserted.data else None
+    _resequence_slides(admin, proposal_id)
+    return new_slide
+
+
+@router.post("/{proposal_id}/slides/{slide_id}/duplicate", status_code=201)
+async def duplicate_slide(
+    proposal_id: str,
+    slide_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    proposal = await _load_proposal_or_404(proposal_id, user)
+    await _assert_org_role(user, proposal["organization_id"], ["owner", "admin", "member"])
+    admin = get_supabase_admin()
+
+    src = (
+        admin.table("proposal_slides").select("*")
+        .eq("id", slide_id).eq("proposal_id", proposal_id).maybe_single().execute().data
+    )
+    if not src:
+        raise HTTPException(404, "Slide not found")
+
+    # Shift subsequent slides
+    rows_after = (
+        admin.table("proposal_slides").select("id, sort_order")
+        .eq("proposal_id", proposal_id).gt("sort_order", src["sort_order"])
+        .order("sort_order").execute().data or []
+    )
+    for r in rows_after:
+        admin.table("proposal_slides").update(
+            {"sort_order": r["sort_order"] + 10}
+        ).eq("id", r["id"]).execute()
+
+    clone = dict(src)
+    clone.pop("id", None)
+    clone.pop("created_at", None)
+    clone.pop("updated_at", None)
+    clone["sort_order"] = src["sort_order"] + 10
+    clone["is_customized"] = True
+    clone["title"] = f"{src.get('title') or src.get('name')} (복제)"
+
+    inserted = admin.table("proposal_slides").insert(clone).execute()
+    new_slide = inserted.data[0] if inserted.data else None
+    _resequence_slides(admin, proposal_id)
+    return new_slide
+
+
+@router.delete("/{proposal_id}/slides/{slide_id}", status_code=204)
+async def delete_slide(
+    proposal_id: str,
+    slide_id: str,
+    user: CurrentUser = Depends(get_current_user),
+):
+    proposal = await _load_proposal_or_404(proposal_id, user)
+    await _assert_org_role(user, proposal["organization_id"], ["owner", "admin", "member"])
+    admin = get_supabase_admin()
+
+    existing = (
+        admin.table("proposal_slides").select("id")
+        .eq("id", slide_id).eq("proposal_id", proposal_id).maybe_single().execute().data
+    )
+    if not existing:
+        raise HTTPException(404, "Slide not found")
+
+    admin.table("proposal_slides").delete().eq("id", slide_id).eq("proposal_id", proposal_id).execute()
+    _resequence_slides(admin, proposal_id)
+    return None
+
+
 # ===== Core assembly =====
 
 async def _assemble_internal(
@@ -586,6 +799,96 @@ async def snapshot_version(
         "current_version": next_version + 1,
     }).eq("id", proposal_id).execute()
     return v.data[0] if v.data else None
+
+
+@router.post("/{proposal_id}/versions/{version_id}/restore")
+async def restore_version(
+    proposal_id: str,
+    version_id: str,
+    body: VersionRestoreRequest | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Restore slides from a saved snapshot. Sprint 2-4.
+
+    Flow:
+      1. (optional) Take a safety snapshot of the current state
+      2. Delete all current proposal_slides rows
+      3. Re-insert rows from snapshot (keep original sort_order)
+      4. Bump current_version on proposals
+    """
+    proposal = await _load_proposal_or_404(proposal_id, user)
+    await _assert_org_role(user, proposal["organization_id"], ["owner", "admin", "member"])
+    admin = get_supabase_admin()
+
+    version_row = (
+        admin.table("proposal_versions").select("*")
+        .eq("id", version_id).eq("proposal_id", proposal_id).maybe_single().execute().data
+    )
+    if not version_row:
+        raise HTTPException(404, "Version not found")
+    snapshot = version_row.get("snapshot") or {}
+    snap_slides = snapshot.get("slides") or []
+    if not snap_slides:
+        raise HTTPException(400, "Snapshot contains no slides")
+
+    req = body or VersionRestoreRequest()
+
+    # 1. Safety snapshot (default on)
+    if req.snapshot_before_restore:
+        current_slides = (
+            admin.table("proposal_slides").select("*")
+            .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+        )
+        safety_version = (proposal.get("current_version") or 1)
+        safety_note = req.change_summary or f"Auto-snapshot before restore of v{version_row.get('version_number')}"
+        admin.table("proposal_versions").insert({
+            "proposal_id": proposal_id,
+            "version_number": safety_version,
+            "snapshot": {
+                "proposal": proposal,
+                "slides": current_slides,
+                "snapshot_at": datetime.utcnow().isoformat(),
+                "auto": True,
+            },
+            "change_summary": safety_note,
+            "created_by": user.id,
+        }).execute()
+        safety_version += 1
+    else:
+        safety_version = (proposal.get("current_version") or 1)
+
+    # 2. Wipe current slides
+    admin.table("proposal_slides").delete().eq("proposal_id", proposal_id).execute()
+
+    # 3. Re-insert
+    fresh_rows = []
+    for s in snap_slides:
+        row = dict(s)
+        row.pop("id", None)
+        row.pop("created_at", None)
+        row.pop("updated_at", None)
+        row["proposal_id"] = proposal_id
+        fresh_rows.append(row)
+    if fresh_rows:
+        admin.table("proposal_slides").insert(fresh_rows).execute()
+    _resequence_slides(admin, proposal_id)
+
+    # 4. Bump version counter
+    admin.table("proposals").update({
+        "current_version": safety_version + 1,
+        "updated_by": user.id,
+    }).eq("id", proposal_id).execute()
+
+    slides_after = (
+        admin.table("proposal_slides").select("*")
+        .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+    )
+    return {
+        "ok": True,
+        "restored_from_version": version_row.get("version_number"),
+        "slide_count": len(slides_after),
+        "slides": slides_after,
+    }
 
 
 # ===== Claude API recommendation stub (Sprint 2-5) =====

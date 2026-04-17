@@ -11,6 +11,7 @@ import type {
   ProposalStakeholder,
   ProposalStatus,
   ProposalTemplate,
+  ProposalVersion,
   TargetPersona,
 } from "@/types/proposal";
 
@@ -200,6 +201,45 @@ export async function reorderSlides(
   });
 }
 
+/* Sprint 2-4: slide insert / duplicate / delete */
+
+export interface SlideInsertPayload {
+  module_code?: string;
+  raw?: Record<string, unknown>;
+  position?: number;
+  title?: string;
+  subtitle?: string;
+  body?: Record<string, unknown>;
+}
+
+export async function insertSlide(
+  proposalId: string,
+  payload: SlideInsertPayload,
+): Promise<ProposalSlide> {
+  return request(`/api/proposals/${proposalId}/slides`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function duplicateSlide(
+  proposalId: string,
+  slideId: string,
+): Promise<ProposalSlide> {
+  return request(`/api/proposals/${proposalId}/slides/${slideId}/duplicate`, {
+    method: "POST",
+  });
+}
+
+export async function deleteSlide(
+  proposalId: string,
+  slideId: string,
+): Promise<void> {
+  await request(`/api/proposals/${proposalId}/slides/${slideId}`, {
+    method: "DELETE",
+  });
+}
+
 /* Assemble / Render */
 
 export interface AssembleRequest {
@@ -238,19 +278,42 @@ export async function publishProposal(
 
 /* Versions */
 
-export async function listVersions(proposalId: string): Promise<Record<string, unknown>[]> {
+export async function listVersions(proposalId: string): Promise<ProposalVersion[]> {
   return request(`/api/proposals/${proposalId}/versions`);
 }
 
 export async function snapshotVersion(
   proposalId: string,
   changeSummary?: string,
-): Promise<Record<string, unknown>> {
+): Promise<ProposalVersion> {
   const p = new URLSearchParams();
   if (changeSummary) p.set("change_summary", changeSummary);
   const qs = p.toString();
   return request(`/api/proposals/${proposalId}/versions${qs ? `?${qs}` : ""}`, {
     method: "POST",
+  });
+}
+
+/* Sprint 2-4: version restore */
+
+export interface VersionRestoreResponse {
+  ok: boolean;
+  restored_from_version: number;
+  slide_count: number;
+  slides: ProposalSlide[];
+}
+
+export async function restoreVersion(
+  proposalId: string,
+  versionId: string,
+  options: { snapshot_before_restore?: boolean; change_summary?: string } = {},
+): Promise<VersionRestoreResponse> {
+  return request(`/api/proposals/${proposalId}/versions/${versionId}/restore`, {
+    method: "POST",
+    body: JSON.stringify({
+      snapshot_before_restore: options.snapshot_before_restore ?? true,
+      change_summary: options.change_summary,
+    }),
   });
 }
 

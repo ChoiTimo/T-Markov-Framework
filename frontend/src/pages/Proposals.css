@@ -261,3 +261,183 @@
   .pe-slides-layout { grid-template-columns: 1fr; }
   .pe-slides-list { max-height: 300px; }
 }
+
+/* ========== Sprint 2-4 additions ========== */
+
+/* Slide list header toolbar */
+.pe-slides-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.pe-icon-btn {
+  font-size: 12px; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid #cbd5e1; background: #fff; cursor: pointer;
+  color: #0f1f3d;
+}
+.pe-icon-btn:hover { background: #eff6ff; border-color: #93c5fd; }
+
+/* Drag handle + tile actions */
+.pe-drag-handle {
+  cursor: grab; user-select: none;
+  background: transparent; border: none; padding: 0 4px;
+  font-size: 14px; color: #94a3b8; letter-spacing: -2px;
+}
+.pe-drag-handle:active { cursor: grabbing; }
+.pe-slide-tile.dragging { background: #eff6ff; box-shadow: 0 6px 16px rgba(15, 31, 61, 0.12); }
+
+.pe-slide-tile-actions {
+  display: none; gap: 4px; margin-top: 6px;
+}
+.pe-slide-tile:hover .pe-slide-tile-actions,
+.pe-slide-tile.active .pe-slide-tile-actions {
+  display: flex;
+}
+.pe-tile-action {
+  font-size: 10.5px; padding: 2px 8px; border-radius: 4px;
+  border: 1px solid #e2e8f0; background: #fff; cursor: pointer; color: #475569;
+}
+.pe-tile-action:hover { background: #f1f5f9; }
+.pe-tile-action.danger { color: #b91c1c; border-color: #fecaca; }
+.pe-tile-action.danger:hover { background: #fef2f2; }
+
+/* Module library modal */
+.pe-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.pe-modal {
+  background: #fff; border-radius: 12px;
+  width: min(860px, 92vw); max-height: 86vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+}
+.pe-modal-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid #e2e8f0;
+}
+.pe-modal-head h3 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; }
+.pe-modal-head .btn-link { margin-left: auto; }
+
+.pe-modal-filters {
+  display: flex; gap: 8px; padding: 12px 20px;
+  border-bottom: 1px solid #f1f5f9; background: #f8fafc;
+}
+.pe-modal-filters input {
+  flex: 1; min-width: 160px;
+  padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+  font-size: 13px;
+}
+.pe-modal-filters select {
+  padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px;
+  font-size: 13px; background: #fff;
+}
+
+.pe-modal-body {
+  padding: 0; overflow-y: auto; flex: 1;
+}
+.pe-module-list { list-style: none; padding: 0; margin: 0; }
+.pe-module-item {
+  padding: 14px 20px; border-bottom: 1px solid #f1f5f9;
+}
+.pe-module-item:hover { background: #f8fafc; }
+.pe-module-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.pe-module-code {
+  font-family: monospace; font-size: 12px; color: #475569;
+  background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+}
+.pe-module-name { font-size: 14px; font-weight: 600; color: #0f172a; }
+.pe-required-badge {
+  background: #fef2f2; color: #991b1b; padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+}
+.pe-module-desc { font-size: 12.5px; color: #475569; margin: 4px 0 8px; }
+.pe-module-foot {
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* Version drawer */
+.pe-drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35);
+  display: flex; justify-content: flex-end; z-index: 55;
+}
+.pe-drawer {
+  width: min(440px, 92vw); height: 100%;
+  background: #fff; display: flex; flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+}
+.pe-drawer-head {
+  padding: 14px 18px; border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pe-drawer-head h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.pe-drawer-body { padding: 8px 0; overflow-y: auto; flex: 1; }
+.pe-version-list { list-style: none; padding: 0; margin: 0; }
+.pe-version-item {
+  padding: 12px 18px; border-bottom: 1px solid #f1f5f9;
+}
+.pe-version-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+}
+.pe-version-no {
+  font-family: monospace; font-weight: 700; color: #0f1f3d;
+  background: #eff6ff; padding: 2px 8px; border-radius: 4px;
+  font-size: 12px;
+}
+.pe-auto-badge {
+  background: #f0fdf4; color: #15803d; padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+}
+.pe-version-summary { font-size: 13px; color: #1e293b; margin: 4px 0; }
+.pe-version-meta { margin-top: 2px; }
+.pe-version-actions { margin-top: 8px; }
+
+/* Markdown editor */
+.pe-md-editor {
+  margin-top: 20px; border: 1px solid #e2e8f0; border-radius: 10px;
+  background: #fff; overflow: hidden;
+}
+.pe-md-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+}
+.pe-md-title { font-size: 12.5px; color: #334155; }
+.pe-md-mode-group { display: flex; gap: 4px; margin-left: auto; }
+.pe-md-mode {
+  font-size: 11.5px; padding: 3px 10px; border-radius: 4px;
+  border: 1px solid #cbd5e1; background: #fff; cursor: pointer; color: #475569;
+}
+.pe-md-mode.active { background: #0f1f3d; color: #fff; border-color: #0f1f3d; }
+
+.pe-md-panels { display: grid; gap: 0; }
+.pe-md-panels.mode-edit { grid-template-columns: 1fr; }
+.pe-md-panels.mode-preview { grid-template-columns: 1fr; }
+.pe-md-panels.mode-split { grid-template-columns: 1fr 1fr; }
+
+.pe-md-textarea {
+  width: 100%; border: none; padding: 12px; font-family: "Menlo", "Consolas", monospace;
+  font-size: 13px; line-height: 1.55; outline: none; resize: vertical;
+  min-height: 160px;
+  background: #fff;
+}
+.pe-md-panels.mode-split .pe-md-textarea {
+  border-right: 1px solid #e2e8f0;
+}
+.pe-md-preview-panel {
+  padding: 14px 16px; background: #fafafa; min-height: 160px;
+  overflow-y: auto;
+}
+.pe-md-preview .pe-md-p {
+  font-size: 14px; line-height: 1.65; color: #1e293b; margin: 0 0 8px;
+}
+.pe-md-preview .pe-md-bullets {
+  margin: 6px 0 10px 18px; line-height: 1.7;
+}
+.pe-md-preview .pe-md-spacer { height: 6px; }
+.pe-md-preview strong { color: #0f1f3d; }
+.pe-md-preview code {
+  background: #eef2f7; padding: 1px 5px; border-radius: 3px;
+  font-family: "Menlo", "Consolas", monospace; font-size: 12.5px;
+}
