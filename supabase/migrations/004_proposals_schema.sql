@@ -429,7 +429,7 @@ insert into public.proposal_slide_modules
 values
   (null, 'P4_problem',         'Customer Problem',        'tension', 'precision_anchoring', true,  'minimal',  '고객의 현재 이슈 - 정량적 근거 포함',       'core',  4,  40),
   (null, 'N2_embodied',        'Embodied Scenario',       'tension', 'embodied_cognition',  false, 'standard', '현장 관점 시나리오 - 실무자 공감대 형성',   'neuro', 14, 45),
-  (null, 'P5_competitive',     'Competitive Threat',      'tension', 'prediction_anchoring',false, 'standard', '경쟁사/대체 솔루션 위협 분석',             'core',  5,  50),
+  (null, 'P5_competitive',     'Competitive Threat',      'tension', 'precision_anchoring',false, 'standard', '경쟁사/대체 솔루션 위협 분석',             'core',  5,  50),
   (null, 'N3_question_risk',   'Risk Question',           'tension', 'active_inference',    false, 'full',     '질문 슬라이드 - 리스크 환기',               'neuro', 15, 55)
 on conflict do nothing;
 
