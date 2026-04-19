@@ -12,6 +12,7 @@ import type {
   ProposalStatus,
   ProposalTemplate,
   ProposalVersion,
+  RecommendationResult,
   TargetPersona,
 } from "@/types/proposal";
 
@@ -314,6 +315,18 @@ export async function restoreVersion(
       snapshot_before_restore: options.snapshot_before_restore ?? true,
       change_summary: options.change_summary,
     }),
+  });
+}
+
+/* Sprint 2-5: Claude API module recommendation */
+
+export async function recommendModules(
+  proposalId: string,
+  options: { additional_notes?: string } = {},
+): Promise<RecommendationResult> {
+  return request(`/api/proposals/${proposalId}/recommend`, {
+    method: "POST",
+    body: JSON.stringify({ additional_notes: options.additional_notes ?? null }),
   });
 }
 

@@ -156,6 +156,32 @@ export interface AssembleResult {
   preserved_count: number;
 }
 
+/* Sprint 2-5: Claude API 추천 결과 */
+
+export interface RecommendationAddition {
+  code: string;
+  phase: string;
+  reason: string;
+}
+
+export interface RecommendationRemoval {
+  code: string;
+  reason: string;
+}
+
+export interface RecommendationEmphasis {
+  code: string;
+  suggestion: string;
+}
+
+export interface RecommendationResult {
+  summary: string;
+  model: string;
+  additions: RecommendationAddition[];
+  removals: RecommendationRemoval[];
+  emphasis: RecommendationEmphasis[];
+}
+
 /* UI 상수 */
 
 export const STATUS_LABELS: Record<ProposalStatus, string> = {

@@ -41,6 +41,7 @@ import {
   listVersions,
   patchSlide,
   publishProposal,
+  recommendModules,
   renderProposalPptx,
   reorderSlides,
   restoreVersion,
@@ -55,6 +56,7 @@ import type {
   ProposalSlideModule,
   ProposalStatus,
   ProposalVersion,
+  RecommendationResult,
   SlidePhase,
   TargetPersona,
 } from "@/types/proposal";
@@ -153,6 +155,13 @@ function ProposalEditor() {
   const [showVersions, setShowVersions] = useState(false);
   const [versions, setVersions] = useState<ProposalVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
+
+  // Sprint 2-5 state — Claude API recommendation
+  const [showRecommend, setShowRecommend] = useState(false);
+  const [recommendLoading, setRecommendLoading] = useState(false);
+  const [recommendation, setRecommendation] = useState<RecommendationResult | null>(null);
+  const [recommendError, setRecommendError] = useState<string | null>(null);
+  const [recommendNotes, setRecommendNotes] = useState("");
 
   const canEdit = myRole === "owner" || myRole === "admin" || myRole === "member";
 
@@ -343,6 +352,69 @@ function ProposalEditor() {
     }
   }
 
+  // ----- Sprint 2-5 handlers — Claude API recommendation -----
+
+  async function openRecommend() {
+    if (!proposal) return;
+    setShowRecommend(true);
+    if (recommendation) return;
+    setRecommendLoading(true);
+    setRecommendError(null);
+    try {
+      const res = await recommendModules(proposal.id, {
+        additional_notes: recommendNotes.trim() || undefined,
+      });
+      setRecommendation(res);
+    } catch (e: any) {
+      setRecommendError(e.message || "추천 요청 실패");
+    } finally {
+      setRecommendLoading(false);
+    }
+  }
+
+  async function refreshRecommend() {
+    if (!proposal) return;
+    setRecommendLoading(true);
+    setRecommendError(null);
+    try {
+      const res = await recommendModules(proposal.id, {
+        additional_notes: recommendNotes.trim() || undefined,
+      });
+      setRecommendation(res);
+    } catch (e: any) {
+      setRecommendError(e.message || "추천 요청 실패");
+    } finally {
+      setRecommendLoading(false);
+    }
+  }
+
+  async function handleApplyRecommendedAddition(code: string) {
+    if (!proposal) return;
+    try {
+      await insertSlide(proposal.id, { module_code: code });
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "슬라이드 추가 실패");
+    }
+  }
+
+  async function handleApplyRecommendedRemoval(code: string) {
+    if (!proposal) return;
+    const target = slides.find((s) => s.code === code);
+    if (!target) {
+      alert("해당 슬라이드를 찾을 수 없습니다.");
+      return;
+    }
+    if (!confirm(`[${code}] 슬라이드를 삭제하시겠어요?`)) return;
+    try {
+      await deleteSlide(proposal.id, target.id);
+      if (activeSlideId === target.id) setActiveSlideId(null);
+      await reload();
+    } catch (e: any) {
+      alert(e.message || "슬라이드 삭제 실패");
+    }
+  }
+
   async function refreshVersions() {
     if (!proposal) return;
     setVersionsLoading(true);
@@ -444,6 +516,9 @@ function ProposalEditor() {
             <>
               <button className="btn btn-ghost" disabled={assembling} onClick={() => handleAssemble(true)}>
                 {assembling ? "조립 중..." : "슬라이드 재조립"}
+              </button>
+              <button className="btn btn-ghost" onClick={openRecommend}>
+                AI 추천
               </button>
               <button className="btn btn-ghost" onClick={handleSnapshot}>
                 버전 스냅샷
@@ -696,6 +771,22 @@ function ProposalEditor() {
           onClose={() => setShowVersions(false)}
           onRestore={handleRestoreVersion}
           canRestore={canEdit}
+        />
+      )}
+
+      {showRecommend && (
+        <RecommendModal
+          loading={recommendLoading}
+          error={recommendError}
+          result={recommendation}
+          notes={recommendNotes}
+          canApply={canEdit}
+          currentSlideCodes={new Set(slides.map((s) => s.code))}
+          onNotesChange={setRecommendNotes}
+          onRefresh={refreshRecommend}
+          onClose={() => setShowRecommend(false)}
+          onApplyAddition={handleApplyRecommendedAddition}
+          onApplyRemoval={handleApplyRecommendedRemoval}
         />
       )}
     </div>
@@ -1113,6 +1204,172 @@ function BodyJsonEditor({
       >
         JSON 저장
       </button>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Sprint 2-5 — Claude API 추천 모달
+// ------------------------------------------------------------------
+
+interface RecommendModalProps {
+  loading: boolean;
+  error: string | null;
+  result: RecommendationResult | null;
+  notes: string;
+  canApply: boolean;
+  currentSlideCodes: Set<string>;
+  onNotesChange: (v: string) => void;
+  onRefresh: () => void;
+  onClose: () => void;
+  onApplyAddition: (code: string) => void;
+  onApplyRemoval: (code: string) => void;
+}
+
+function RecommendModal({
+  loading,
+  error,
+  result,
+  notes,
+  canApply,
+  currentSlideCodes,
+  onNotesChange,
+  onRefresh,
+  onClose,
+  onApplyAddition,
+  onApplyRemoval,
+}: RecommendModalProps) {
+  return (
+    <div className="pe-modal-backdrop" onClick={onClose}>
+      <div className="pe-modal pe-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div className="pe-modal-head">
+          <div style={{ flex: 1 }}>
+            <h3>AI 기반 제안서 추천</h3>
+            <div className="muted small">
+              고객 맥락·현재 슬라이드 구성·모듈 카탈로그를 분석해 추가·제거·강조 포인트를 제안합니다.
+            </div>
+          </div>
+          <button className="btn btn-ghost small" onClick={onClose}>
+            닫기
+          </button>
+        </div>
+
+        <div className="pe-modal-filters">
+          <label style={{ flex: 1 }}>
+            <span className="muted small">추가 지시사항 (선택)</span>
+            <textarea
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              rows={2}
+              placeholder="예) CFO 설득 관점 강화, 경쟁사 대응 섹션 추가 등"
+            />
+          </label>
+          <button
+            className="btn btn-primary small"
+            onClick={onRefresh}
+            disabled={loading}
+          >
+            {loading ? "분석 중…" : "다시 분석"}
+          </button>
+        </div>
+
+        {error && <div className="error-inline">{error}</div>}
+
+        {loading && !result && (
+          <div className="pe-recommend-loading">
+            <span className="spinner" /> Claude에 맥락을 전달하는 중입니다…
+          </div>
+        )}
+
+        {result && (
+          <div className="pe-recommend-body">
+            {result.summary && (
+              <section className="pe-recommend-summary">
+                <h4>요약</h4>
+                <p>{result.summary}</p>
+                <div className="muted small" style={{ marginTop: 4 }}>
+                  모델: {result.model}
+                </div>
+              </section>
+            )}
+
+            <section className="pe-recommend-section">
+              <h4>추가 제안 ({result.additions.length})</h4>
+              {result.additions.length === 0 ? (
+                <div className="muted small">추가 제안이 없습니다.</div>
+              ) : (
+                <ul className="pe-recommend-list">
+                  {result.additions.map((a) => {
+                    const already = currentSlideCodes.has(a.code);
+                    return (
+                      <li key={`add-${a.code}`} className="pe-recommend-item">
+                        <div className="pe-recommend-item-head">
+                          <strong>{a.code}</strong>
+                          {a.phase && <span className="muted small">· {a.phase}</span>}
+                          {already && <span className="badge">이미 포함됨</span>}
+                        </div>
+                        <div className="pe-recommend-reason">{a.reason}</div>
+                        {canApply && !already && (
+                          <button
+                            className="btn btn-ghost small"
+                            onClick={() => onApplyAddition(a.code)}
+                          >
+                            이 모듈 삽입
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section className="pe-recommend-section">
+              <h4>제거 제안 ({result.removals.length})</h4>
+              {result.removals.length === 0 ? (
+                <div className="muted small">제거 제안이 없습니다.</div>
+              ) : (
+                <ul className="pe-recommend-list">
+                  {result.removals.map((r) => (
+                    <li key={`rm-${r.code}`} className="pe-recommend-item">
+                      <div className="pe-recommend-item-head">
+                        <strong>{r.code}</strong>
+                      </div>
+                      <div className="pe-recommend-reason">{r.reason}</div>
+                      {canApply && (
+                        <button
+                          className="btn btn-ghost small danger"
+                          onClick={() => onApplyRemoval(r.code)}
+                        >
+                          이 슬라이드 삭제
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="pe-recommend-section">
+              <h4>강조 전환 제안 ({result.emphasis.length})</h4>
+              {result.emphasis.length === 0 ? (
+                <div className="muted small">강조 전환 제안이 없습니다.</div>
+              ) : (
+                <ul className="pe-recommend-list">
+                  {result.emphasis.map((e) => (
+                    <li key={`em-${e.code}`} className="pe-recommend-item">
+                      <div className="pe-recommend-item-head">
+                        <strong>{e.code}</strong>
+                      </div>
+                      <div className="pe-recommend-reason">{e.suggestion}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

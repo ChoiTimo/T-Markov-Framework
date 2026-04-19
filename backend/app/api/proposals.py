@@ -27,11 +27,17 @@ from pydantic import BaseModel, Field
 from app.auth import CurrentUser, get_current_user
 from app.db import get_supabase_admin
 from app.services.proposal import (
+    CustomerContext,
+    ModuleCatalogItem,
     ProposalContext,
+    RecommenderInvalidResponse,
+    RecommenderUnavailable,
     SelectionInput,
+    SlideSnapshot,
     assemble_pptx,
     attach_cross_references,
     build_slide_instances,
+    recommend as recommend_service,
     select_modules,
     validate_selection,
 )
@@ -891,12 +897,127 @@ async def restore_version(
     }
 
 
-# ===== Claude API recommendation stub (Sprint 2-5) =====
+# ===== Claude API module recommendation (Sprint 2-5) =====
+
+class RecommendRequest(BaseModel):
+    additional_notes: str | None = None
+
+
+def _quote_summary_lines(quote: dict | None) -> list[str]:
+    if not quote:
+        return []
+    items = quote.get("items") or []
+    if not items:
+        return []
+    # Sort by total desc if the field is present; otherwise preserve order.
+    try:
+        items_sorted = sorted(
+            items,
+            key=lambda it: float(it.get("total_price") or it.get("subtotal") or 0),
+            reverse=True,
+        )
+    except (TypeError, ValueError):
+        items_sorted = items
+    out: list[str] = []
+    for it in items_sorted[:5]:
+        name = it.get("name") or it.get("module_name") or "-"
+        qty = it.get("quantity") or it.get("qty") or "-"
+        total = it.get("total_price") or it.get("subtotal") or "-"
+        out.append(f"{name} — qty {qty} / total {total}")
+    return out
+
+
+def _battle_card_summary_lines(battle_cards: list[dict]) -> list[str]:
+    out: list[str] = []
+    for card in (battle_cards or [])[:4]:
+        competitor = (card.get("competitors") or {}).get("name") or card.get("competitor_name") or "경쟁사"
+        weaknesses = card.get("weaknesses") or []
+        differentiators = card.get("differentiators") or []
+        if weaknesses:
+            out.append(f"{competitor} 약점 — {str(weaknesses[0])[:140]}")
+        if differentiators:
+            out.append(f"{competitor} 대비 차별점 — {str(differentiators[0])[:140]}")
+    return out
+
 
 @router.post("/{proposal_id}/recommend")
-async def recommend_modules(proposal_id: str, user: CurrentUser = Depends(get_current_user)):
-    await _load_proposal_or_404(proposal_id, user)
+async def recommend_modules(
+    proposal_id: str,
+    body: RecommendRequest | None = None,
+    user: CurrentUser = Depends(get_current_user),
+):
+    proposal = await _load_proposal_or_404(proposal_id, user)
+    admin = get_supabase_admin()
+
+    # Current slides
+    slides_rows = (
+        admin.table("proposal_slides").select("code, phase, title, is_enabled")
+        .eq("proposal_id", proposal_id).order("sort_order").execute().data or []
+    )
+    current_slides = [
+        SlideSnapshot(
+            code=str(s.get("code") or ""),
+            phase=str(s.get("phase") or ""),
+            title=s.get("title"),
+            is_enabled=bool(s.get("is_enabled", True)),
+        )
+        for s in slides_rows if s.get("code")
+    ]
+
+    # Available modules (org + global)
+    module_rows = _fetch_all_modules(proposal.get("organization_id"))
+    available_modules = [
+        ModuleCatalogItem(
+            code=str(m.get("code") or ""),
+            name=str(m.get("name") or ""),
+            phase=str(m.get("phase") or ""),
+            neuro_dogma=m.get("neuro_dogma"),
+            body_hint=m.get("body_hint"),
+        )
+        for m in module_rows if m.get("code")
+    ]
+
+    # Quote + battle card context
+    quote = None
+    if proposal.get("quote_id"):
+        quote = (
+            admin.table("quotes").select("*, items:quote_items(*)")
+            .eq("id", proposal["quote_id"]).maybe_single().execute().data
+        )
+    battle_cards: list[dict] = []
+    if proposal.get("battle_card_ids"):
+        battle_cards = (
+            admin.table("battle_cards").select("*, competitors(name)")
+            .in_("id", proposal["battle_card_ids"]).execute().data or []
+        )
+
+    customer = CustomerContext(
+        name=proposal.get("customer_name"),
+        company=proposal.get("customer_company"),
+        industry=proposal.get("customer_industry") or proposal.get("industry"),
+        segment=proposal.get("customer_segment"),
+        target_persona=proposal.get("target_persona"),
+        stakeholders=list(proposal.get("stakeholders") or []),
+        notes=(body.additional_notes if body else None) or proposal.get("notes"),
+        quote_summary=_quote_summary_lines(quote),
+        battle_card_summary=_battle_card_summary_lines(battle_cards),
+    )
+
+    try:
+        result = recommend_service(
+            customer=customer,
+            current_slides=current_slides,
+            available_modules=available_modules,
+        )
+    except RecommenderUnavailable as exc:
+        raise HTTPException(503, str(exc))
+    except RecommenderInvalidResponse as exc:
+        raise HTTPException(502, f"추천 엔진 응답을 해석하지 못했습니다: {exc}")
+
     return {
-        "message": "Claude API recommendation stub — will be implemented in Sprint 2-5",
-        "sprint": "2-5",
+        "summary": result.summary,
+        "model": result.model,
+        "additions": [a.__dict__ for a in result.additions],
+        "removals": [r.__dict__ for r in result.removals],
+        "emphasis": [e.__dict__ for e in result.emphasis],
     }

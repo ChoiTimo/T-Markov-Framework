@@ -1,9 +1,21 @@
 """Proposal Generator service — absorbs tmarkov-app logic.
 
 Sprint 2-3: module_selector, pptx_assembler, neuro_optimizer (delivered)
-Sprint 2-5: Claude API module recommendation (planned)
+Sprint 2-5: Claude API module recommendation (delivered)
 """
 
+from .claude_recommender import (
+    CustomerContext,
+    ModuleCatalogItem,
+    RecommendationAddition,
+    RecommendationEmphasis,
+    RecommendationRemoval,
+    RecommendationResult,
+    RecommenderInvalidResponse,
+    RecommenderUnavailable,
+    SlideSnapshot,
+    recommend,
+)
 from .module_selector import (
     SelectionInput,
     SelectionResult,
@@ -26,4 +38,14 @@ __all__ = [
     "build_slide_instances",
     "attach_cross_references",
     "assemble_pptx",
+    "CustomerContext",
+    "ModuleCatalogItem",
+    "SlideSnapshot",
+    "RecommendationAddition",
+    "RecommendationEmphasis",
+    "RecommendationRemoval",
+    "RecommendationResult",
+    "RecommenderUnavailable",
+    "RecommenderInvalidResponse",
+    "recommend",
 ]
