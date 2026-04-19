@@ -107,6 +107,10 @@ class SlideInsert(BaseModel):
     Either `module_code` (to materialize from the module catalog) or
     `raw` (to insert a fully custom slide) must be provided.
     `position` is 1-based; omit to append at the end.
+
+    Sprint 2-6: when the insertion originates from a Claude recommendation,
+    `recommendation_event_id` links the new slide back to the event log and
+    the event's `applied_additions` array is updated.
     """
     module_code: str | None = None
     raw: dict | None = None
@@ -114,6 +118,8 @@ class SlideInsert(BaseModel):
     title: str | None = None
     subtitle: str | None = None
     body: dict | None = None
+    recommendation_event_id: str | None = None
+    recommendation_reason: str | None = None
 
 
 class VersionRestoreRequest(BaseModel):
@@ -161,6 +167,41 @@ async def _load_proposal_or_404(proposal_id: str, user: CurrentUser) -> dict:
         raise HTTPException(404, "Proposal not found")
     await _assert_org_role(user, r.data["organization_id"], ["owner", "admin", "member", "viewer"])
     return r.data
+
+
+# ----- Sprint 2-6: recommendation event helpers -----
+
+def _append_event_applied(
+    event_id: str,
+    proposal_id: str,
+    column: str,
+    code: str,
+) -> None:
+    """Append `code` to the event's applied_additions/applied_removals jsonb array.
+
+    Safe against missing/foreign events — silently skips if the event row
+    cannot be loaded or belongs to a different proposal.
+    """
+    if column not in ("applied_additions", "applied_removals"):
+        return
+    admin = get_supabase_admin()
+    event = (
+        admin.table("proposal_recommendation_events")
+        .select(f"id, proposal_id, {column}")
+        .eq("id", event_id)
+        .maybe_single()
+        .execute()
+        .data
+    )
+    if not event or event.get("proposal_id") != proposal_id:
+        return
+    current = list(event.get(column) or [])
+    if code in current:
+        return
+    current.append(code)
+    admin.table("proposal_recommendation_events").update(
+        {column: current}
+    ).eq("id", event_id).execute()
 
 
 def _fetch_template_modules(template_id: str) -> list[dict]:
@@ -507,12 +548,27 @@ async def insert_slide(
     else:
         raise HTTPException(400, "Either module_code or raw is required")
 
+    # Sprint 2-6: mark AI-origin metadata when the insertion originates from a recommendation.
+    if body.recommendation_event_id:
+        row["ai_recommendation_event_id"] = body.recommendation_event_id
+        row["ai_generated"] = True
+        if body.recommendation_reason:
+            row["ai_recommended_reason"] = body.recommendation_reason
+
     # Compute insertion sort_order
     pos = body.position
     if pos is None or pos > len(existing):
         row["sort_order"] = ((existing[-1]["sort_order"] if existing else 0) + 10) if existing else 10
         inserted = admin.table("proposal_slides").insert(row).execute()
-        return inserted.data[0] if inserted.data else None
+        new_slide = inserted.data[0] if inserted.data else None
+        if new_slide and body.recommendation_event_id and row.get("code"):
+            _append_event_applied(
+                body.recommendation_event_id,
+                proposal_id,
+                "applied_additions",
+                str(row["code"]),
+            )
+        return new_slide
 
     if pos < 1:
         pos = 1
@@ -532,6 +588,13 @@ async def insert_slide(
     inserted = admin.table("proposal_slides").insert(row).execute()
     new_slide = inserted.data[0] if inserted.data else None
     _resequence_slides(admin, proposal_id)
+    if new_slide and body.recommendation_event_id and row.get("code"):
+        _append_event_applied(
+            body.recommendation_event_id,
+            proposal_id,
+            "applied_additions",
+            str(row["code"]),
+        )
     return new_slide
 
 
@@ -581,6 +644,10 @@ async def duplicate_slide(
 async def delete_slide(
     proposal_id: str,
     slide_id: str,
+    recommendation_event_id: str | None = Query(
+        default=None,
+        description="Sprint 2-6: Claude 추천의 제거 제안에서 호출된 경우 이벤트 id",
+    ),
     user: CurrentUser = Depends(get_current_user),
 ):
     proposal = await _load_proposal_or_404(proposal_id, user)
@@ -588,7 +655,7 @@ async def delete_slide(
     admin = get_supabase_admin()
 
     existing = (
-        admin.table("proposal_slides").select("id")
+        admin.table("proposal_slides").select("id, code")
         .eq("id", slide_id).eq("proposal_id", proposal_id).maybe_single().execute().data
     )
     if not existing:
@@ -596,6 +663,14 @@ async def delete_slide(
 
     admin.table("proposal_slides").delete().eq("id", slide_id).eq("proposal_id", proposal_id).execute()
     _resequence_slides(admin, proposal_id)
+
+    if recommendation_event_id and existing.get("code"):
+        _append_event_applied(
+            recommendation_event_id,
+            proposal_id,
+            "applied_removals",
+            str(existing["code"]),
+        )
     return None
 
 
@@ -1014,10 +1089,156 @@ async def recommend_modules(
     except RecommenderInvalidResponse as exc:
         raise HTTPException(502, f"추천 엔진 응답을 해석하지 못했습니다: {exc}")
 
+    # Sprint 2-6: persist the recommendation event for reporting/tracking.
+    additions_json = [a.__dict__ for a in result.additions]
+    removals_json = [r.__dict__ for r in result.removals]
+    emphasis_json = [e.__dict__ for e in result.emphasis]
+
+    event_id: str | None = None
+    try:
+        event_row = {
+            "proposal_id": proposal_id,
+            "organization_id": proposal["organization_id"],
+            "model": result.model,
+            "additional_notes": body.additional_notes if body else None,
+            "summary": result.summary,
+            "additions": additions_json,
+            "removals": removals_json,
+            "emphasis": emphasis_json,
+            "additions_count": len(additions_json),
+            "removals_count": len(removals_json),
+            "emphasis_count": len(emphasis_json),
+            "raw_response": result.raw if getattr(result, "raw", None) else {},
+            "created_by": user.id,
+        }
+        inserted = (
+            admin.table("proposal_recommendation_events")
+            .insert(event_row).execute()
+        )
+        if inserted.data:
+            event_id = inserted.data[0].get("id")
+    except Exception:
+        # 트래킹 실패가 핵심 응답을 망치지 않도록 로그 저장 실패는 조용히 무시.
+        event_id = None
+
     return {
+        "event_id": event_id,
         "summary": result.summary,
         "model": result.model,
-        "additions": [a.__dict__ for a in result.additions],
-        "removals": [r.__dict__ for r in result.removals],
-        "emphasis": [e.__dict__ for e in result.emphasis],
+        "additions": additions_json,
+        "removals": removals_json,
+        "emphasis": emphasis_json,
+    }
+
+
+# ===== Sprint 2-6: recommendation stats =====
+
+@router.get("/stats/recommendations")
+async def recommendation_stats(
+    org_id: str = Query(..., description="조직 ID"),
+    days: int = Query(default=30, ge=1, le=180, description="집계 기간(일)"),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """조직 단위 Claude 추천 호출·적용 집계.
+
+    Returns:
+        {
+          range: { days, from, to },
+          totals: { calls, additions, removals, emphasis,
+                    applied_additions, applied_removals,
+                    addition_rate, removal_rate },
+          daily: [{day, calls, additions, removals,
+                   applied_additions, applied_removals}],
+          top_applied_modules: [{code, count}]
+        }
+    """
+    await _assert_org_role(user, org_id, ["owner", "admin", "member", "viewer"])
+    admin = get_supabase_admin()
+
+    from datetime import timedelta
+
+    now = datetime.utcnow()
+    start = now - timedelta(days=days)
+
+    events = (
+        admin.table("proposal_recommendation_events")
+        .select(
+            "id, proposal_id, created_at, additions_count, removals_count,"
+            " emphasis_count, applied_additions, applied_removals"
+        )
+        .eq("organization_id", org_id)
+        .gte("created_at", start.isoformat())
+        .order("created_at")
+        .execute()
+        .data
+        or []
+    )
+
+    totals = {
+        "calls": len(events),
+        "additions": 0,
+        "removals": 0,
+        "emphasis": 0,
+        "applied_additions": 0,
+        "applied_removals": 0,
+    }
+    daily: dict[str, dict] = {}
+    module_counter: dict[str, int] = {}
+
+    for ev in events:
+        day = (ev.get("created_at") or "")[:10] or "unknown"
+        d = daily.setdefault(
+            day,
+            {
+                "day": day,
+                "calls": 0,
+                "additions": 0,
+                "removals": 0,
+                "applied_additions": 0,
+                "applied_removals": 0,
+            },
+        )
+        d["calls"] += 1
+        d["additions"] += int(ev.get("additions_count") or 0)
+        d["removals"] += int(ev.get("removals_count") or 0)
+        applied_add = list(ev.get("applied_additions") or [])
+        applied_rm = list(ev.get("applied_removals") or [])
+        d["applied_additions"] += len(applied_add)
+        d["applied_removals"] += len(applied_rm)
+
+        totals["additions"] += int(ev.get("additions_count") or 0)
+        totals["removals"] += int(ev.get("removals_count") or 0)
+        totals["emphasis"] += int(ev.get("emphasis_count") or 0)
+        totals["applied_additions"] += len(applied_add)
+        totals["applied_removals"] += len(applied_rm)
+
+        for code in applied_add:
+            if not code:
+                continue
+            module_counter[str(code)] = module_counter.get(str(code), 0) + 1
+
+    totals["addition_rate"] = (
+        round(totals["applied_additions"] / totals["additions"], 4)
+        if totals["additions"] else 0.0
+    )
+    totals["removal_rate"] = (
+        round(totals["applied_removals"] / totals["removals"], 4)
+        if totals["removals"] else 0.0
+    )
+
+    top_modules = sorted(
+        ({"code": k, "count": v} for k, v in module_counter.items()),
+        key=lambda x: x["count"],
+        reverse=True,
+    )[:10]
+
+    return {
+        "range": {
+            "days": days,
+            "from": start.isoformat(),
+            "to": now.isoformat(),
+        },
+        "totals": totals,
+        "daily": sorted(daily.values(), key=lambda d: d["day"]),
+        "top_applied_modules": top_modules,
     }

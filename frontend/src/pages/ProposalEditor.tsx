@@ -390,8 +390,13 @@ function ProposalEditor() {
 
   async function handleApplyRecommendedAddition(code: string) {
     if (!proposal) return;
+    const match = recommendation?.additions.find((a) => a.code === code);
     try {
-      await insertSlide(proposal.id, { module_code: code });
+      await insertSlide(proposal.id, {
+        module_code: code,
+        recommendation_event_id: recommendation?.event_id ?? undefined,
+        recommendation_reason: match?.reason,
+      });
       await reload();
     } catch (e: any) {
       alert(e.message || "슬라이드 추가 실패");
@@ -407,7 +412,9 @@ function ProposalEditor() {
     }
     if (!confirm(`[${code}] 슬라이드를 삭제하시겠어요?`)) return;
     try {
-      await deleteSlide(proposal.id, target.id);
+      await deleteSlide(proposal.id, target.id, {
+        recommendation_event_id: recommendation?.event_id ?? undefined,
+      });
       if (activeSlideId === target.id) setActiveSlideId(null);
       await reload();
     } catch (e: any) {
@@ -853,6 +860,14 @@ function SortableSlideTile({
         <span className="pe-slide-code">{slide.code}</span>
         {slide.is_customized && <span className="pe-custom-badge">편집</span>}
         {!slide.is_enabled && <span className="pe-disabled-badge">비활성</span>}
+        {slide.ai_recommendation_event_id && (
+          <span
+            className="pe-ai-badge"
+            title={slide.ai_recommended_reason ?? "AI 추천을 통해 적용된 슬라이드"}
+          >
+            AI
+          </span>
+        )}
       </div>
       <div className="pe-slide-tile-title">{slide.title || slide.name}</div>
       {canEdit && (

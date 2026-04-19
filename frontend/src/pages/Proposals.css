@@ -186,6 +186,12 @@
   background: #e5e7eb; color: #6b7280; padding: 1px 6px; border-radius: 4px;
   font-size: 10px;
 }
+.pe-ai-badge {
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  color: #fff; padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+  cursor: help;
+}
 .pe-slide-tile-title {
   font-size: 13px; color: #111; font-weight: 500;
 }

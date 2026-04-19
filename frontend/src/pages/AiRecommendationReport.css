@@ -1,0 +1,269 @@
+/* AI 추천 리포트 페이지 */
+
+.ai-report-page {
+  padding: 24px 32px;
+  max-width: 1280px;
+}
+
+.ai-report-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.ai-report-page .page-header h2 {
+  margin: 0 0 4px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ai-report-page .page-subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.ai-report-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-report-range {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  color: #0f172a;
+}
+
+/* KPI */
+.ai-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ai-kpi-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-kpi-label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: none;
+  font-weight: 500;
+}
+
+.ai-kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.ai-kpi-hint {
+  font-size: 12px;
+  color: #475569;
+}
+
+.ai-rate-positive {
+  color: #0ea5e9;
+}
+.ai-rate-neutral {
+  color: #7c3aed;
+}
+
+/* 카드 */
+.ai-report-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.ai-report-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ai-report-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.ai-report-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* 범례 */
+.ai-legend {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  color: #475569;
+}
+
+.ai-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.ai-dot-call {
+  background: #0ea5e9;
+}
+.ai-dot-add {
+  background: #10b981;
+}
+.ai-dot-remove {
+  background: #f59e0b;
+}
+
+/* 차트 */
+.ai-daily-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 200px;
+  padding-top: 8px;
+  overflow-x: auto;
+}
+
+.ai-daily-col {
+  flex: 1 0 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 24px;
+}
+
+.ai-daily-bars {
+  width: 100%;
+  height: 170px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.ai-bar {
+  flex: 1;
+  min-width: 4px;
+  border-radius: 2px 2px 0 0;
+  transition: opacity 0.15s;
+  min-height: 2px;
+}
+.ai-bar:hover {
+  opacity: 0.75;
+}
+
+.ai-bar-call {
+  background: #0ea5e9;
+}
+.ai-bar-add {
+  background: #10b981;
+}
+.ai-bar-remove {
+  background: #f59e0b;
+}
+
+.ai-daily-label {
+  font-size: 10px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* 상위 모듈 테이블 */
+.ai-top-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ai-top-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ai-top-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #0f172a;
+}
+
+.ai-top-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ai-top-code {
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12px;
+  color: #4f46e5;
+}
+
+/* 공통 */
+.ai-report-page .empty-state {
+  color: #94a3b8;
+  text-align: center;
+  padding: 32px 0;
+  font-size: 13px;
+}
+.ai-report-page .loading {
+  color: #64748b;
+  text-align: center;
+  padding: 32px 0;
+}
+.ai-report-page .error-text {
+  color: #dc2626;
+  text-align: center;
+  padding: 32px 0;
+}
+.ai-report-page .btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ai-report-page .btn:hover {
+  background: #f8fafc;
+}
+.ai-report-page .btn-secondary {
+  background: #fff;
+  color: #334155;
+}

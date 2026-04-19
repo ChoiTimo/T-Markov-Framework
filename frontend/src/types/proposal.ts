@@ -89,6 +89,8 @@ export interface ProposalSlide {
   is_customized: boolean;
   ai_generated: boolean;
   ai_model: string | null;
+  ai_recommendation_event_id?: string | null;
+  ai_recommended_reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -175,11 +177,48 @@ export interface RecommendationEmphasis {
 }
 
 export interface RecommendationResult {
+  event_id: string | null;
   summary: string;
   model: string;
   additions: RecommendationAddition[];
   removals: RecommendationRemoval[];
   emphasis: RecommendationEmphasis[];
+}
+
+/* Sprint 2-6: 추천 트래킹 리포트 */
+
+export interface RecommendationDailyRow {
+  day: string;
+  calls: number;
+  additions: number;
+  removals: number;
+  applied_additions: number;
+  applied_removals: number;
+}
+
+export interface RecommendationTopModule {
+  code: string;
+  count: number;
+}
+
+export interface RecommendationStats {
+  range: {
+    days: number;
+    from: string;
+    to: string;
+  };
+  totals: {
+    calls: number;
+    additions: number;
+    removals: number;
+    emphasis: number;
+    applied_additions: number;
+    applied_removals: number;
+    addition_rate: number;
+    removal_rate: number;
+  };
+  daily: RecommendationDailyRow[];
+  top_applied_modules: RecommendationTopModule[];
 }
 
 /* UI 상수 */

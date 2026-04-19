@@ -13,6 +13,7 @@ import type {
   ProposalTemplate,
   ProposalVersion,
   RecommendationResult,
+  RecommendationStats,
   TargetPersona,
 } from "@/types/proposal";
 
@@ -211,6 +212,9 @@ export interface SlideInsertPayload {
   title?: string;
   subtitle?: string;
   body?: Record<string, unknown>;
+  /** Sprint 2-6: 추천 이벤트에서 기원한 경우 */
+  recommendation_event_id?: string;
+  recommendation_reason?: string;
 }
 
 export async function insertSlide(
@@ -235,8 +239,12 @@ export async function duplicateSlide(
 export async function deleteSlide(
   proposalId: string,
   slideId: string,
+  options: { recommendation_event_id?: string } = {},
 ): Promise<void> {
-  await request(`/api/proposals/${proposalId}/slides/${slideId}`, {
+  const qs = options.recommendation_event_id
+    ? `?recommendation_event_id=${encodeURIComponent(options.recommendation_event_id)}`
+    : "";
+  await request(`/api/proposals/${proposalId}/slides/${slideId}${qs}`, {
     method: "DELETE",
   });
 }
@@ -328,6 +336,17 @@ export async function recommendModules(
     method: "POST",
     body: JSON.stringify({ additional_notes: options.additional_notes ?? null }),
   });
+}
+
+/* Sprint 2-6: Recommendation tracking stats */
+
+export async function getRecommendationStats(
+  orgId: string,
+  options: { days?: number } = {},
+): Promise<RecommendationStats> {
+  const p = new URLSearchParams({ org_id: orgId });
+  if (options.days) p.set("days", String(options.days));
+  return request(`/api/proposals/stats/recommendations?${p}`);
 }
 
 /* Helper: download blob as file */
