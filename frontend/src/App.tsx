@@ -16,6 +16,14 @@ import AuditLogs from "@/pages/AuditLogs";
 import AiRecommendationReport from "@/pages/AiRecommendationReport";
 import CompetitiveFeed from "@/pages/CompetitiveFeed";
 import InsightsDashboard from "@/pages/InsightsDashboard";
+import Customers from "@/pages/Customers";
+import CustomerDetail from "@/pages/CustomerDetail";
+import DealPipeline from "@/pages/DealPipeline";
+import ModuleCatalog from "@/pages/ModuleCatalog";
+import ModuleDetail from "@/pages/ModuleDetail";
+import ReportsIndex from "@/pages/ReportsIndex";
+import AISettings from "@/pages/AISettings";
+import NotificationsSettings from "@/pages/NotificationsSettings";
 import Login from "@/pages/Login";
 
 function App() {
@@ -47,6 +55,14 @@ function App() {
         <Route path="reports/ai-recommendations" element={<AiRecommendationReport />} />
         <Route path="reports/competitive" element={<CompetitiveFeed />} />
         <Route path="insights" element={<InsightsDashboard />} />
+        <Route path="customers" element={<Customers />} />
+        <Route path="customers/:id" element={<CustomerDetail />} />
+        <Route path="deals" element={<DealPipeline />} />
+        <Route path="modules" element={<ModuleCatalog />} />
+        <Route path="modules/:code" element={<ModuleDetail />} />
+        <Route path="reports" element={<ReportsIndex />} />
+        <Route path="settings/ai" element={<AISettings />} />
+        <Route path="settings/notifications" element={<NotificationsSettings />} />
       </Route>
     </Routes>
   );

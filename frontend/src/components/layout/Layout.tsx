@@ -1,21 +1,29 @@
+import { useState } from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
+import NotificationsBell from "@/components/global/NotificationsBell";
+import CommandPalette from "@/components/global/CommandPalette";
+import OnboardingModal from "@/components/global/OnboardingModal";
 import "./Layout.css";
 
 const mainNavItems = [
   { path: "/", label: "Dashboard", icon: "grid" },
-  { path: "/quotes", label: "견적계산기", icon: "calculator" },
+  { path: "/customers", label: "고객 관리", icon: "users" },
+  { path: "/deals", label: "딜 파이프라인", icon: "layout" },
+  { path: "/quotes", label: "견적 계산기", icon: "calculator" },
   { path: "/battlecards", label: "배틀카드", icon: "shield" },
   { path: "/proposals", label: "제안서 생성", icon: "file-text" },
+  { path: "/modules", label: "모듈 카탈로그", icon: "package" },
   { path: "/insights", label: "통합 인사이트", icon: "trending-up" },
-  { path: "/reports/competitive", label: "경쟁 피드", icon: "radio" },
-  { path: "/reports/ai-recommendations", label: "AI 추천 리포트", icon: "bar-chart" },
+  { path: "/reports", label: "리포트", icon: "bar-chart" },
 ];
 
 const adminNavItems = [
   { path: "/members", label: "멤버 관리", icon: "users" },
   { path: "/org/settings", label: "조직 설정", icon: "settings" },
+  { path: "/settings/ai", label: "AI 설정", icon: "cpu" },
+  { path: "/settings/notifications", label: "알림 설정", icon: "bell" },
   { path: "/audit-logs", label: "감사 로그", icon: "clipboard" },
 ];
 
@@ -23,6 +31,7 @@ function Layout() {
   const { user, signOut } = useAuth();
   const { currentOrg, organizations, myRole, switchOrg } = useOrg();
   const isAdmin = myRole === "owner" || myRole === "admin";
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   return (
     <div className="layout">
@@ -112,8 +121,42 @@ function Layout() {
         </div>
       </aside>
       <main className="content">
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 16px",
+            background: "linear-gradient(90deg, #312e81, #4338ca)",
+            color: "#fff",
+            fontSize: 13,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowOnboarding(true)}
+            title="환영 가이드 다시 보기"
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              color: "#fff",
+              padding: "4px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            가이드
+          </button>
+          <span style={{ opacity: 0.7, fontSize: 11 }}>Cmd/Ctrl + K 로 빠른 이동</span>
+          <NotificationsBell />
+        </div>
         <Outlet />
       </main>
+
+      <CommandPalette />
+      <OnboardingModal open={showOnboarding} onClose={() => setShowOnboarding(false)} />
     </div>
   );
 }

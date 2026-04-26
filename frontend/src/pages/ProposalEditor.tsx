@@ -74,6 +74,7 @@ import type { Quote } from "@/types/quote";
 import AssistantPanel from "@/components/ai/AssistantPanel";
 import SuccessProbabilityGauge from "@/components/proposals/SuccessProbabilityGauge";
 import WinLossLabelModal from "@/components/proposals/WinLossLabelModal";
+import ModuleWinRateBadge from "@/components/proposals/ModuleWinRateBadge";
 import "./Proposals.css";
 
 // ------------------------------------------------------------------
@@ -1037,6 +1038,7 @@ function ModuleLibraryModal({
                     />
                     <span className="pe-module-code">{m.code}</span>
                     <span className="pe-module-name">{m.name}</span>
+                    <ModuleWinRateBadge code={m.code} />
                     {m.is_required && <span className="pe-required-badge">필수</span>}
                     {m.neuro_dogma && (
                       <span className="pe-dogma-badge">{DOGMA_LABELS[m.neuro_dogma]}</span>

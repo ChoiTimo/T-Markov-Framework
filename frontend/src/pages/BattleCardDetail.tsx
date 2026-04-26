@@ -579,6 +579,45 @@ function BattleCardDetail() {
         )}
       </section>
 
+      <section
+        className="shell-card"
+        style={{
+          margin: "16px 0",
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+          padding: 18,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 15 }}>관련 경쟁 신호 (mock)</h3>
+          <a href="/reports/competitive" style={{ fontSize: 12, color: "#4338ca", textDecoration: "none" }}>전체 피드 →</a>
+        </div>
+        <ul style={{ listStyle: "none", padding: 0, margin: "12px 0 0" }}>
+          <li style={{ borderTop: "1px solid #f3f4f6", paddingTop: 10, marginTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: 13 }}>가격 정책 12% 인하 발표</strong>
+              <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 999, background: "#fed7aa", color: "#9a3412", fontWeight: 600 }}>중요</span>
+            </div>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "4px 0 0" }}>
+              엔터프라이즈 라이선스 등급 평균 12% 인하. RFP 가격 비교에서 변별력 약화 가능.
+            </p>
+          </li>
+          <li style={{ borderTop: "1px solid #f3f4f6", paddingTop: 10, marginTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <strong style={{ fontSize: 13 }}>OS 7.6 GA — Workflow Studio</strong>
+              <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 999, background: "#fef3c7", color: "#92400e", fontWeight: 600 }}>주의</span>
+            </div>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "4px 0 0" }}>
+              정책 자동화 기능 기본 라이선스 포함. 데모 흐름에서 운영 자동화 유스케이스 보강 필요.
+            </p>
+          </li>
+        </ul>
+        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 12 }}>
+          UI 미리보기 단계입니다. 백엔드 연결 후 competitive_intel_signals 에서 자동 매칭됩니다.
+        </div>
+      </section>
+
       <AssistantPanel surface="battlecard" surfaceRefId={id ?? null} />
     </div>
   );
