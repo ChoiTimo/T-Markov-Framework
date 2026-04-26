@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import AssistantPanel from "@/components/ai/AssistantPanel";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   calcClientTotals,
@@ -746,6 +747,8 @@ function QuoteEditor() {
           )}
         </aside>
       </div>
+
+      <AssistantPanel surface="quote" surfaceRefId={id ?? null} />
     </div>
   );
 }
