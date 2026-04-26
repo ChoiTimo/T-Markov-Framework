@@ -71,6 +71,7 @@ import {
 } from "@/types/proposal";
 import type { BattleCard } from "@/types/battlecard";
 import type { Quote } from "@/types/quote";
+import AssistantPanel from "@/components/ai/AssistantPanel";
 import "./Proposals.css";
 
 // ------------------------------------------------------------------
@@ -796,6 +797,12 @@ function ProposalEditor() {
           onApplyRemoval={handleApplyRecommendedRemoval}
         />
       )}
+
+      <AssistantPanel
+        surface="proposal_editor"
+        surfaceRefId={id ?? null}
+        contextLabel={proposal.title}
+      />
     </div>
   );
 }
