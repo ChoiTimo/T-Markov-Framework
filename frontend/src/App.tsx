@@ -14,6 +14,8 @@ import CreateOrg from "@/pages/CreateOrg";
 import Profile from "@/pages/Profile";
 import AuditLogs from "@/pages/AuditLogs";
 import AiRecommendationReport from "@/pages/AiRecommendationReport";
+import CompetitiveFeed from "@/pages/CompetitiveFeed";
+import InsightsDashboard from "@/pages/InsightsDashboard";
 import Login from "@/pages/Login";
 
 function App() {
@@ -43,6 +45,8 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="reports/ai-recommendations" element={<AiRecommendationReport />} />
+        <Route path="reports/competitive" element={<CompetitiveFeed />} />
+        <Route path="insights" element={<InsightsDashboard />} />
       </Route>
     </Routes>
   );

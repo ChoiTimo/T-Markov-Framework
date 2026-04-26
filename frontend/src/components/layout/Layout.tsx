@@ -8,6 +8,8 @@ const mainNavItems = [
   { path: "/quotes", label: "견적계산기", icon: "calculator" },
   { path: "/battlecards", label: "배틀카드", icon: "shield" },
   { path: "/proposals", label: "제안서 생성", icon: "file-text" },
+  { path: "/insights", label: "통합 인사이트", icon: "trending-up" },
+  { path: "/reports/competitive", label: "경쟁 피드", icon: "radio" },
   { path: "/reports/ai-recommendations", label: "AI 추천 리포트", icon: "bar-chart" },
 ];
 

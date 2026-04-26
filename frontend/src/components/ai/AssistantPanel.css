@@ -242,3 +242,51 @@
 .ai-conv-title { font-weight: 500; color: #111827; font-size: 13px; }
 .ai-conv-meta { font-size: 11px; color: #6b7280; }
 .ai-pin { margin-right: 4px; }
+
+/* ConversationList 보강 (Sprint 3-1.b UI shell) */
+.ai-conv-li { position: relative; margin-bottom: 6px; }
+.ai-conv-actions {
+  display: none;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  gap: 2px;
+  background: rgba(255,255,255,0.95);
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+.ai-conv-li:hover .ai-conv-actions { display: flex; }
+.ai-conv-action {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.ai-conv-action:hover { background: #f3f4f6; }
+.ai-conv-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ai-conv-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.ai-conv-tag {
+  background: #eef2ff;
+  color: #4338ca;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+
+.ai-conv-tag-edit {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0 6px 6px;
+}
+.ai-conv-tag-edit input {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+}
