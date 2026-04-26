@@ -15,6 +15,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Literal
 
@@ -188,48 +189,103 @@ async def chat(
             {"role": "user" if m["role"] == "user" else "assistant", "content": text}
         )
 
-    # 5. Claude 호출 (도구 루프는 1라운드만 처리하는 단순화 — 추후 보강)
+    # 5. Claude 호출 + 도구 루프 (Sprint 3-1.b: second pass + max_iterations 가드)
     client = _claude_client()
     tool_calls_out: list[ToolCallOut] = []
     final_text = ""
     usage = {"input_tokens": 0, "output_tokens": 0}
+    MAX_TOOL_ITERATIONS = 5
 
     try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=2048,
-            system=_system_prompt(),
-            tools=ai_tools.TOOL_SCHEMAS,
-            messages=anthropic_messages,
-        )
-        usage["input_tokens"] = response.usage.input_tokens
-        usage["output_tokens"] = response.usage.output_tokens
-
-        # tool_use 블록 처리
-        tool_use_blocks = [b for b in response.content if getattr(b, "type", None) == "tool_use"]
-        text_blocks = [b for b in response.content if getattr(b, "type", None) == "text"]
-
-        for tu in tool_use_blocks:
-            res = ai_tools.execute_tool(
-                tool_name=tu.name,
-                args=dict(tu.input or {}),
-                conversation_id=conversation_id,
-                organization_id=body.organization_id,
-                requested_by=user.id,
+        for iteration in range(MAX_TOOL_ITERATIONS):
+            response = client.messages.create(
+                model=model,
+                max_tokens=2048,
+                system=_system_prompt(),
+                tools=ai_tools.TOOL_SCHEMAS,
+                messages=anthropic_messages,
             )
-            tool_calls_out.append(
-                ToolCallOut(
-                    tool_execution_id=res["tool_execution_id"],
+            usage["input_tokens"] += response.usage.input_tokens
+            usage["output_tokens"] += response.usage.output_tokens
+
+            tool_use_blocks = [
+                b for b in response.content if getattr(b, "type", None) == "tool_use"
+            ]
+            text_blocks = [
+                b for b in response.content if getattr(b, "type", None) == "text"
+            ]
+
+            # 마지막으로 본 자연어 텍스트가 최종 답변. 도구 결과 second pass 후의 텍스트가 우선됨.
+            if text_blocks:
+                final_text = "\n".join(b.text for b in text_blocks)
+
+            # stop_reason='end_turn' 또는 도구 호출이 없으면 루프 종료
+            if response.stop_reason != "tool_use" or not tool_use_blocks:
+                break
+
+            # 1) assistant 응답(tool_use 포함)을 messages 에 그대로 적재
+            assistant_blocks: list[dict[str, Any]] = []
+            for block in response.content:
+                btype = getattr(block, "type", None)
+                if btype == "text":
+                    assistant_blocks.append({"type": "text", "text": block.text})
+                elif btype == "tool_use":
+                    assistant_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": dict(block.input or {}),
+                        }
+                    )
+            anthropic_messages.append({"role": "assistant", "content": assistant_blocks})
+
+            # 2) 각 도구 실행 + tool_result 블록 수집
+            tool_result_blocks: list[dict[str, Any]] = []
+            for tu in tool_use_blocks:
+                res = ai_tools.execute_tool(
                     tool_name=tu.name,
-                    status=res["status"],
-                    mutates_data=res["mutates_data"],
-                    result=res["result"],
+                    args=dict(tu.input or {}),
+                    conversation_id=conversation_id,
+                    organization_id=body.organization_id,
+                    requested_by=user.id,
                 )
-            )
+                tool_calls_out.append(
+                    ToolCallOut(
+                        tool_execution_id=res["tool_execution_id"],
+                        tool_name=tu.name,
+                        status=res["status"],
+                        mutates_data=res["mutates_data"],
+                        result=res["result"],
+                    )
+                )
+                # 쓰기 도구의 pending 상태는 모델에게도 그대로 전달 (Confirm 대기 정보 포함)
+                tool_result_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tu.id,
+                        "content": json.dumps(
+                            {
+                                "status": res["status"],
+                                "mutates_data": res["mutates_data"],
+                                "result": res["result"],
+                            },
+                            ensure_ascii=False,
+                            default=str,
+                        ),
+                    }
+                )
 
-        final_text = "\n".join(b.text for b in text_blocks) if text_blocks else ""
+            # 3) tool_result 를 user role 메시지로 적재 → 모델이 결과를 보고 자연어 답변
+            anthropic_messages.append({"role": "user", "content": tool_result_blocks})
 
-        # tool 결과를 다시 모델에게 보내는 두 번째 라운드는 추후 sprint 에서 추가 (현 스켈레톤에서는 1턴만 반환)
+        else:
+            # for-else: MAX_TOOL_ITERATIONS 를 모두 소진했지만 break 없이 종료한 경우
+            if not final_text:
+                final_text = (
+                    "(도구 호출이 반복 한도(%d회)에 도달하여 응답을 마감합니다.)"
+                    % MAX_TOOL_ITERATIONS
+                )
 
     except APIError as e:
         logger.exception("Claude API error")

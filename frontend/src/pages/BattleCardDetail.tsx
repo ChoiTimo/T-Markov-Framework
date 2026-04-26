@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import AssistantPanel from "@/components/ai/AssistantPanel";
 import {
   DndContext,
   PointerSensor,
@@ -577,6 +578,8 @@ function BattleCardDetail() {
           </div>
         )}
       </section>
+
+      <AssistantPanel surface="battlecard" surfaceRefId={id ?? null} />
     </div>
   );
 }

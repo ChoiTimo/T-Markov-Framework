@@ -5,6 +5,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrg } from "@/contexts/OrgContext";
 import { useNavigate } from "react-router-dom";
+import AssistantPanel from "@/components/ai/AssistantPanel";
 import "./Dashboard.css";
 
 const phases = [
@@ -131,6 +132,8 @@ function Dashboard() {
           ))}
         </div>
       </section>
+
+      <AssistantPanel surface="dashboard" surfaceRefId={null} />
     </div>
   );
 }
