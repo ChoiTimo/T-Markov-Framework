@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api import health, customers, deals, quotes, battlecards, proposals
+from app.api import health, customers, deals, quotes, battlecards, proposals, ai
 from app.api import auth as auth_api
 from app.api import organizations as orgs_api
 
@@ -36,3 +36,4 @@ app.include_router(deals.router, prefix="/api/deals", tags=["Deals"])
 app.include_router(quotes.router, prefix="/api/quotes", tags=["Quotes"])
 app.include_router(battlecards.router, prefix="/api/battlecards", tags=["BattleCards"])
 app.include_router(proposals.router, prefix="/api/proposals", tags=["Proposals"])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI Assistant"])
