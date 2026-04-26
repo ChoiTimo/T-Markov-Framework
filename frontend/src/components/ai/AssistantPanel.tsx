@@ -46,6 +46,7 @@ export default function AssistantPanel({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [conversations, setConversations] = useState<AssistantConversation[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
   const [convLoading, setConvLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export default function AssistantPanel({
         setError(e instanceof Error ? e.message : "대화 목록 로드 실패"),
       )
       .finally(() => setConvLoading(false));
-  }, [open, orgId, surface, surfaceRefId]);
+  }, [open, orgId, surface, surfaceRefId, reloadKey]);
 
   const selectConversation = useCallback(
     async (conv: AssistantConversation) => {
@@ -199,6 +200,7 @@ export default function AssistantPanel({
               loading={convLoading}
               onSelect={selectConversation}
               onNew={startNew}
+              onMetaChange={() => setReloadKey((k) => k + 1)}
             />
           ) : (
             <AssistantThread messages={messages} loading={sending} />

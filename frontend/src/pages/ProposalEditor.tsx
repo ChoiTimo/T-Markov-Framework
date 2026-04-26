@@ -72,6 +72,8 @@ import {
 import type { BattleCard } from "@/types/battlecard";
 import type { Quote } from "@/types/quote";
 import AssistantPanel from "@/components/ai/AssistantPanel";
+import SuccessProbabilityGauge from "@/components/proposals/SuccessProbabilityGauge";
+import WinLossLabelModal from "@/components/proposals/WinLossLabelModal";
 import "./Proposals.css";
 
 // ------------------------------------------------------------------
@@ -139,6 +141,8 @@ function ProposalEditor() {
 
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [slides, setSlides] = useState<ProposalSlide[]>([]);
+  const [showWinLossModal, setShowWinLossModal] = useState(false);
+  const [lastDealOutcome, setLastDealOutcome] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [battleCards, setBattleCards] = useState<BattleCard[]>([]);
   const [loading, setLoading] = useState(false);
@@ -797,6 +801,41 @@ function ProposalEditor() {
           onApplyRemoval={handleApplyRecommendedRemoval}
         />
       )}
+
+      {/* Sprint 3-3 UI shell — 좌측 하단 floating widget (성공 확률 + Win/Loss 라벨 진입) */}
+      <div
+        style={{
+          position: "fixed",
+          left: 24,
+          bottom: 24,
+          width: 240,
+          zIndex: 850,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        <SuccessProbabilityGauge
+          slideCount={slides.length}
+          slideCodes={slides.map((s) => s.code)}
+        />
+        <button
+          className="btn btn-ghost small"
+          style={{ background: "#fff", border: "1px solid #e5e7eb" }}
+          onClick={() => setShowWinLossModal(true)}
+        >
+          {lastDealOutcome ? `결과 입력 완료 (${lastDealOutcome})` : "딜 결과 입력"}
+        </button>
+      </div>
+
+      <WinLossLabelModal
+        open={showWinLossModal}
+        onClose={() => setShowWinLossModal(false)}
+        onSubmit={(payload) => {
+          setLastDealOutcome(payload.status);
+          setShowWinLossModal(false);
+        }}
+      />
 
       <AssistantPanel
         surface="proposal_editor"
