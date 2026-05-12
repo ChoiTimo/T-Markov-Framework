@@ -25,11 +25,13 @@ import ReportsIndex from "@/pages/ReportsIndex";
 import AISettings from "@/pages/AISettings";
 import NotificationsSettings from "@/pages/NotificationsSettings";
 import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
         path="/"
         element={

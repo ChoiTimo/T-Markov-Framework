@@ -47,7 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/`,
+        // PKCE flow 콜백을 명시적 라우트에서 처리해야 React Router 와 함께 안정적으로 동작
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
   };
